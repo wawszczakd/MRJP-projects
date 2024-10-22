@@ -1,0 +1,5 @@
+dist-newstyle
+examples/*.ll
+examples/*.bc
+insc_llvm
+insc_jvm

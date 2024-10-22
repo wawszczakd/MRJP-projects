@@ -20,11 +20,11 @@ module Main where
                         exitFailure
                     (Right program) -> do
                         let
-                            llvmCode = compileProgramLLVM program
+                            code = compileProgramLLVM program
                             llFile = replaceExtension file "ll"
                             bcFile = replaceExtension file "bc"
                         withFile llFile WriteMode $ \handle -> do
-                            hPutStrLn handle llvmCode
+                            hPutStrLn handle code
                         putStrLn $ "LLVM code has been written to " ++ llFile
                         _ <- runCommand $ "llvm-as " ++ llFile ++ " -o " ++ bcFile
                         putStrLn $ "Bytecode has been written to " ++ bcFile
