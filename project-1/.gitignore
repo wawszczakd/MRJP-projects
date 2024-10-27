@@ -1,5 +1,7 @@
 dist-newstyle
-examples/*.ll
-examples/*.bc
+*.ll
+*.bc
+*.j
+*.class
 insc_llvm
 insc_jvm

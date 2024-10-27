@@ -5,5 +5,5 @@ all:
 
 clean:
 	cabal clean
-	rm -f examples/*.ll examples/*.bc
+	rm -f examples/*.ll examples/*.bc examples/*.j examples/*.class
 	rm -f insc_llvm insc_jvm

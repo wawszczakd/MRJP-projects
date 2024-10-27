@@ -23,11 +23,10 @@ module Main where
                             code = compileProgramLLVM program
                             llFile = replaceExtension file "ll"
                             bcFile = replaceExtension file "bc"
-                        withFile llFile WriteMode $ \handle -> do
-                            hPutStrLn handle code
+                        writeFile llFile code
                         putStrLn $ "LLVM code has been written to " ++ llFile
-                        _ <- runCommand $ "llvm-as " ++ llFile ++ " -o " ++ bcFile
-                        putStrLn $ "Bytecode has been written to " ++ bcFile
+                        _ <- system $ "llvm-as " ++ llFile ++ " -o " ++ bcFile
+                        putStrLn $ "Generated: " ++ bcFile
             _ -> do
                 putStrLn "Invalid usage! Give a file as an argument."
                 exitFailure

@@ -1,7 +1,9 @@
 module Main where
     import System.Environment
     import System.Exit
+    import System.FilePath
     import System.IO
+    import System.Process
     import ParInstant
     import CompilerJVM
     
@@ -17,7 +19,13 @@ module Main where
                         putStrLn err
                         exitFailure
                     (Right program) -> do
-                        putStrLn $ compileProgramJVM program
+                        let
+                            code = compileProgramJVM program file
+                            jFile = replaceExtension file "j"
+                        writeFile jFile code
+                        putStrLn $ "JVM code has been written to " ++ jFile
+                        _ <- system $ "java -jar lib/jasmin.jar " ++ jFile
+                        return ()
             _ -> do
                 putStrLn "Invalid usage! Give a file as an argument."
                 exitFailure
