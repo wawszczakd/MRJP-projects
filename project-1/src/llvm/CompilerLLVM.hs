@@ -82,6 +82,8 @@ module CompilerLLVM where
     compileProgramLLVM :: Program -> String
     compileProgramLLVM (Prog stmts) =
         let
+            (programBody, _) = runState (compileStmts stmts) (0, empty)
+            programBodyIndented = Data.List.map ("    " ++) programBody
             programHead = [ "@dnl = internal constant [4 x i8] c\"%d\\0A\\00\""
                           , ""
                           , "declare i32 @printf(i8*, ...)"
@@ -96,7 +98,5 @@ module CompilerLLVM where
                           , "entry:" ]
             programTail = [ "    ret i32 0"
                           , "}" ]
-            (programBody, _) = runState (compileStmts stmts) (0, empty)
-            programBodyIndented = Data.List.map ("    " ++) programBody
         in
             unlines (programHead ++ programBodyIndented ++ programTail)
