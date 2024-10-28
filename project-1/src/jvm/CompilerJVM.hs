@@ -6,6 +6,7 @@ module CompilerJVM where
     import Control.Monad.State
     import AbsInstant
     
+    -- (next available location, map of variables to their locations) --
     type StateMonad = State (Integer, Data.Map.Map String Integer)
     
     loadInstr :: Integer -> String
@@ -29,6 +30,7 @@ module CompilerJVM where
         else
             return (max depth2 (depth1 + 1), code2 ++ code1 ++ ["swap", op])
     
+    -- (max stack depth, generated JVM code) --
     compileExpr :: Exp -> StateMonad (Integer, [String])
     compileExpr (ExpAdd expr1 expr2) = do
         doArithmeticOp expr1 expr2 "iadd"
@@ -54,14 +56,14 @@ module CompilerJVM where
     
     compileStmt :: Stmt -> StateMonad (Integer, [String])
     compileStmt (SAss (Ident var) expr) = do
-        (lastLoc, varMap) <- get
+        (nextLoc, varMap) <- get
         (depth, code) <- compileExpr expr
         case Data.Map.lookup var varMap of
             Just loc -> do
                 return (depth, code ++ [storeInstr loc])
             Nothing -> do
-                put (lastLoc + 1, Data.Map.insert var lastLoc varMap)
-                return (depth, code ++ [storeInstr lastLoc])
+                put (nextLoc + 1, Data.Map.insert var nextLoc varMap)
+                return (depth, code ++ [storeInstr nextLoc])
     
     compileStmt (SExp expr) = do
         (depth, code) <- compileExpr expr
@@ -79,7 +81,7 @@ module CompilerJVM where
     compileProgramJVM :: Program -> String -> String
     compileProgramJVM (Prog stmts) file =
         let
-            ((maxDepth, programBody), (lastLoc, _)) = runState (compileStmts stmts) (1, empty)
+            ((maxDepth, programBody), (nextLoc, _)) = runState (compileStmts stmts) (1, empty)
             programBodyIndented = Data.List.map ("    " ++) programBody
             parts = splitOn "/" file
             baseName = takeWhile (/= '.') (last parts)
@@ -96,7 +98,7 @@ module CompilerJVM where
                           , ""
                           , ".method public static main([Ljava/lang/String;)V"
                           , ".limit stack " ++ show maxDepth
-                          , ".limit locals " ++ show lastLoc ]
+                          , ".limit locals " ++ show nextLoc ]
             programTail = [ "    return"
                           , ".end method" ]
         in

@@ -23,14 +23,14 @@ module CompilerLLVM where
     doArithmeticOp expr1 expr2 op = do
         (exprVal1, code1) <- compileExpr expr1
         (exprVal2, code2) <- compileExpr expr2
-        (lastReg, varMap) <- get
-        put (lastReg + 1, varMap)
+        (nextReg, varMap) <- get
+        put (nextReg + 1, varMap)
         let
-            resReg = regToString lastReg
+            resReg = regToString nextReg
             arg1 = exprValToString exprVal1
             arg2 = exprValToString exprVal2
             instr = resReg ++ " = " ++ op ++ " i32 " ++ arg1 ++ ", " ++ arg2
-        return (Reg lastReg, code1 ++ code2 ++ [instr])
+        return (Reg nextReg, code1 ++ code2 ++ [instr])
     
     -- (expression value (number or register), generated LLVM code) --
     compileExpr :: Exp -> StateMonad (ExprVal, [String])
@@ -51,21 +51,21 @@ module CompilerLLVM where
     
     compileStmt :: Stmt -> StateMonad [String]
     compileStmt (SAss (Ident var) expr) = do
-        (lastReg, varMap) <- get
+        (nextReg, varMap) <- get
         (exprVal, code) <- compileExpr expr
         case Data.Map.lookup var varMap of
             Just (allocReg, _) -> do
-                put (lastReg + 1, Data.Map.insert var (allocReg, lastReg) varMap)
+                put (nextReg + 1, Data.Map.insert var (allocReg, nextReg) varMap)
                 let
                     storeInstr = "store i32 " ++ exprValToString exprVal ++ ", i32* " ++ regToString allocReg
-                    loadInstr = regToString lastReg ++ " = load i32, i32* " ++ regToString allocReg
+                    loadInstr = regToString nextReg ++ " = load i32, i32* " ++ regToString allocReg
                 return (code ++ [storeInstr, loadInstr])
             Nothing -> do
-                put (lastReg + 2, Data.Map.insert var (lastReg, lastReg + 1) varMap)
+                put (nextReg + 2, Data.Map.insert var (nextReg, nextReg + 1) varMap)
                 let
-                    allocInstr = regToString lastReg ++ " = alloca i32"
-                    storeInstr = "store i32 " ++ exprValToString exprVal ++ ", i32* " ++ regToString lastReg
-                    loadInstr = regToString (lastReg + 1) ++ " = load i32, i32* " ++ regToString lastReg
+                    allocInstr = regToString nextReg ++ " = alloca i32"
+                    storeInstr = "store i32 " ++ exprValToString exprVal ++ ", i32* " ++ regToString nextReg
+                    loadInstr = regToString (nextReg + 1) ++ " = load i32, i32* " ++ regToString nextReg
                 return (code ++ [allocInstr, storeInstr, loadInstr])
     
     compileStmt (SExp expr) = do
