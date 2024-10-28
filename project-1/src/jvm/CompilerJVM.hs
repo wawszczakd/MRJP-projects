@@ -43,10 +43,9 @@ module CompilerJVM where
     
     compileStmts :: [Stmt] -> StateMonad [String]
     compileStmts stmts = do
-        code <- foldM (\acc stmt -> do
-                            stmtCode <- compileStmt stmt
-                            return $ acc ++ stmtCode ++ [""]) [] stmts
-        return code
+        foldM (\acc stmt -> do
+                    stmtCode <- compileStmt stmt
+                    return $ acc ++ stmtCode ++ [""]) [] stmts
     
     compileProgramJVM :: Program -> String -> String
     compileProgramJVM (Prog stmts) file =

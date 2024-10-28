@@ -75,10 +75,9 @@ module CompilerLLVM where
     
     compileStmts :: [Stmt] -> StateMonad [String]
     compileStmts stmts = do
-        code <- foldM (\acc stmt -> do
-                            stmtCode <- compileStmt stmt
-                            return $ acc ++ stmtCode ++ [""]) [] stmts
-        return code
+        foldM (\acc stmt -> do
+                    stmtCode <- compileStmt stmt
+                    return $ acc ++ stmtCode ++ [""]) [] stmts
     
     compileProgramLLVM :: Program -> String
     compileProgramLLVM (Prog stmts) =
