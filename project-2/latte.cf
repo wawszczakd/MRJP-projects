@@ -40,7 +40,7 @@ BStmt.     Stmt ::= Block ;
 
 Decl.      Stmt ::= Type [Item] ";" ;
 
-NoInit.    Item ::= Ident ; 
+NoInit.    Item ::= Ident ;
 
 Init.      Item ::= Ident "=" Expr ;
 
@@ -124,7 +124,9 @@ ENewObj.   Expr6 ::= "new" Ident ;
 
 ENewArr.   Expr6 ::= "new" Type "[" Expr "]" ;
 
-ECastNull. Expr6 ::= "(" Type ")" "null" ;
+token Null ([")"] ([" "]["\t"]["\n"])* ["null"]) ;
+
+ECastNull. Expr6 ::= "(" Type Null ;
 
 coercions  Expr 6 ;
 

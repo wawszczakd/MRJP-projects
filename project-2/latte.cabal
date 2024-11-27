@@ -1,0 +1,25 @@
+cabal-version:      3.4
+name:               latte
+version:            0.1.0.0
+
+author:             Dominik Wawszczak
+maintainer:         Dominik Wawszczak
+
+executable latte
+    main-is: Main.hs
+    
+    other-modules:
+        AbsLatte,
+        LexLatte,
+        ParLatte,
+    
+    build-depends:
+        array      ^>= 0.5.4.0,
+        base       ^>= 4.15.1.0,
+        containers ^>= 0.7,
+        filepath   ^>= 1.4.2.1,
+        mtl        ^>= 2.2.2,
+        process    ^>= 1.6.13.2,
+        split      ^>= 0.2.5
+    hs-source-dirs:   src, src/bnfc
+    default-language: Haskell2010
