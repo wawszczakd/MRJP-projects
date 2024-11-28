@@ -24,7 +24,7 @@ module Main where
                     (Right program) -> do
                         res <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
                         case res of
-                            Right () -> putStrLn $ "Type checking succesful."
+                            Right () -> putStrLn "Type checking succesful."
                             Left err -> putStrLn $ "Type checking failed: " ++ err
             _ -> do
                 putStrLn "Invalid usage! Give a file as an argument."
