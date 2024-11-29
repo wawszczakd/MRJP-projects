@@ -6,6 +6,8 @@ module Common where
     
     data MyType = MyInt | MyStr | MyBool | MyVoid | MyFun MyType [MyType] deriving (Eq, Show)
     
+    data ValueState = FixedInt Integer | FixedBool Bool | FixedString String | Unknown
+    
     toMyType :: Type -> MyType
     toMyType (Int _) = MyInt
     toMyType (Str _) = MyStr

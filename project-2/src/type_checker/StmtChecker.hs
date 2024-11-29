@@ -39,7 +39,7 @@ module StmtChecker where
                     return $ Data.Map.insert (Ident name) (toMyType typ, depth) env
             insertVar depth env (Init pos (Ident name) expr) =
                 checkAlreadyDeclared depth env (Ident name) pos >>= \_ -> do
-                    exprType <- getExprType expr
+                    (exprType, _) <- getExprType expr
                     if exprType /= toMyType typ then
                         throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
                     else
@@ -57,7 +57,7 @@ module StmtChecker where
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
             Just (varType, _) -> do
-                exprType <- getExprType expr
+                (exprType, _) <- getExprType expr
                 if exprType /= varType then
                     throwError ("Type mismatch in assignment to " ++ name ++ ", " ++ showPosition pos)
                 else
@@ -85,7 +85,7 @@ module StmtChecker where
     
     checkStmt _ retType (Ret pos expr) = do
         env <- ask
-        exprType <- getExprType expr
+        (exprType, _) <- getExprType expr
         if exprType /= retType then
             throwError ("Wrong return type, " ++ showPosition pos)
         else
@@ -100,31 +100,41 @@ module StmtChecker where
     
     checkStmt depth retType (Cond pos expr stmt) = do
         env <- ask
-        exprType <- getExprType expr
+        (exprType, exprVal) <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt (depth + 1) retType stmt)
-            return (env, False)
+            (_, ret) <- local (const env) (checkStmt (depth + 1) retType stmt)
+            let isRet = case exprVal of
+                    FixedBool True -> ret
+                    _              -> False
+            return (env, isRet)
     
     checkStmt depth retType (CondElse pos expr stmt1 stmt2) = do
         env <- ask
-        exprType <- getExprType expr
+        (exprType, exprVal) <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
             (_, ret1) <- local (const env) (checkStmt (depth + 1) retType stmt1)
             (_, ret2) <- local (const env) (checkStmt (depth + 1) retType stmt2)
-            return (env, ret1 && ret2)
+            let isRet = case exprVal of
+                    FixedBool True  -> ret1
+                    FixedBool False -> ret2
+                    _               -> ret1 && ret2
+            return (env, isRet)
     
     checkStmt depth retType (While pos expr stmt) = do
         env <- ask
-        exprType <- getExprType expr
+        (exprType, exprVal) <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'while' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt (depth + 1) retType stmt)
-            return (env, False)
+            (_, ret) <- local (const env) (checkStmt (depth + 1) retType stmt)
+            let isRet = case exprVal of
+                    FixedBool True -> ret
+                    _              -> False
+            return (env, isRet)
     
     checkStmt _ _ (SExp _ expr) = do
         env <- ask
