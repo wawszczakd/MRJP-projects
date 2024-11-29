@@ -6,40 +6,32 @@ module StmtChecker where
     import Data.Map
     import ExprChecker
     
-    checkStmts :: [Stmt] -> TypeCheckerMonad (Maybe (MyType, BNFC'Position))
+    checkStmts :: MyType -> [Stmt] -> TypeCheckerMonad Bool
     
-    checkStmts [] = do
-        return Nothing
+    checkStmts retType [] = do
+        return False
     
-    checkStmts (stmt : stmts) = do
+    checkStmts retType (stmt : stmts) = do
         env <- ask
-        (env', ret1) <- local (const env) (checkStmt stmt)
-        ret2 <- local (const env') (checkStmts stmts)
-        case (ret1, ret2) of
-            (Nothing, Nothing) -> return Nothing
-            (Just ret, Nothing) -> return (Just ret)
-            (Nothing, Just ret) -> return (Just ret)
-            (Just (typ1, pos1), Just (typ2, pos2)) ->
-                if typ1 /= typ2 then
-                    throwError ("Return types do not match, " ++ showPosition pos2)
-                else
-                    return (Just (typ1, pos1))
+        (env', ret1) <- local (const env) (checkStmt retType stmt)
+        ret2 <- local (const env') (checkStmts retType stmts)
+        return (ret1 || ret2)
     
-    checkStmt :: Stmt -> TypeCheckerMonad (Env, Maybe (MyType, BNFC'Position))
+    checkStmt :: MyType -> Stmt -> TypeCheckerMonad (Env, Bool)
     
-    checkStmt (Empty _) = do
+    checkStmt _ (Empty _) = do
         env <- ask
-        return (env, Nothing)
+        return (env, False)
     
-    checkStmt (BStmt _ (Blck _ stmts)) = do
+    checkStmt retType (BStmt _ (Blck _ stmts)) = do
         env <- ask
-        ret <- local (const env) (checkStmts stmts)
+        ret <- local (const env) (checkStmts retType stmts)
         return (env, ret)
     
-    checkStmt (Decl _ typ vars) = do
+    checkStmt _ (Decl _ typ vars) = do
         env <- ask
         env' <- foldM insertVar env vars
-        return (env', Nothing)
+        return (env', False)
         where
             insertVar :: Env -> Item -> TypeCheckerMonad Env
             insertVar env (NoInit pos (Ident name)) = do
@@ -56,7 +48,7 @@ module StmtChecker where
                         else
                             return $ Data.Map.insert (Ident name) (toMyType typ) env
     
-    checkStmt (Ass _ (LVar pos (Ident name)) expr) = do
+    checkStmt _ (Ass _ (LVar pos (Ident name)) expr) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
@@ -65,9 +57,9 @@ module StmtChecker where
                 if exprType /= varType then
                     throwError ("Type mismatch in assignment to " ++ name ++ ", " ++ showPosition pos)
                 else
-                    return (env, Nothing)
+                    return (env, False)
     
-    checkStmt (Incr _ (LVar pos (Ident name))) = do
+    checkStmt _ (Incr _ (LVar pos (Ident name))) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
@@ -75,9 +67,9 @@ module StmtChecker where
                 if varType /= MyInt then
                     throwError ("Variable " ++ name ++ " is not an integer, " ++ showPosition pos)
                 else
-                    return (env, Nothing)
+                    return (env, False)
     
-    checkStmt (Decr _ (LVar pos (Ident name))) = do
+    checkStmt _ (Decr _ (LVar pos (Ident name))) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
@@ -85,52 +77,52 @@ module StmtChecker where
                 if varType /= MyInt then
                     throwError ("Variable " ++ name ++ " is not an integer, " ++ showPosition pos)
                 else
-                    return (env, Nothing)
+                    return (env, False)
     
-    checkStmt (Ret pos expr) = do
+    checkStmt retType (Ret pos expr) = do
         env <- ask
         exprType <- getExprType expr
-        return (env, Just (exprType, pos))
+        if exprType /= retType then
+            throwError ("Wrong return type, " ++ showPosition pos)
+        else
+            return (env, True)
     
-    checkStmt (VRet pos) = do
+    checkStmt retType (VRet pos) = do
         env <- ask
-        return (env, Just (MyVoid, pos))
+        if retType /= MyVoid then
+            throwError ("Wrong return type, " ++ showPosition pos)
+        else
+            return (env, True)
     
-    checkStmt (Cond pos expr stmt) = do
-        env <- ask
-        exprType <- getExprType expr
-        if exprType /= MyBool then
-            throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
-        else do
-            (_, _) <- local (const env) (checkStmt stmt)
-            return (env, Nothing)
-    
-    checkStmt (CondElse pos expr stmt1 stmt2) = do
+    checkStmt retType (Cond pos expr stmt) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, ret1) <- local (const env) (checkStmt stmt1)
-            (_, ret2) <- local (const env) (checkStmt stmt2)
-            case (ret1, ret2) of
-                (Just (typ1, _), Just (typ2, _)) -> do
-                    if typ1 /= typ2 then
-                        throwError ("Return types do not match, " ++ showPosition pos)
-                    else
-                        return (env, Just (typ1, pos))
-                (_, _) -> return (env, Nothing)
+            (_, _) <- local (const env) (checkStmt retType stmt)
+            return (env, False)
     
-    checkStmt (While pos expr stmt) = do
+    checkStmt retType (CondElse pos expr stmt1 stmt2) = do
+        env <- ask
+        exprType <- getExprType expr
+        if exprType /= MyBool then
+            throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
+        else do
+            (_, ret1) <- local (const env) (checkStmt retType stmt1)
+            (_, ret2) <- local (const env) (checkStmt retType stmt2)
+            return (env, ret1 && ret2)
+    
+    checkStmt retType (While pos expr stmt) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'while' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt stmt)
-            return (env, Nothing)
+            (_, _) <- local (const env) (checkStmt retType stmt)
+            return (env, False)
     
-    checkStmt (SExp _ expr) = do
+    checkStmt _ (SExp _ expr) = do
         env <- ask
         _ <- getExprType expr
-        return (env, Nothing)
+        return (env, False)

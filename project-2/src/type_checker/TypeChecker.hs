@@ -68,14 +68,12 @@ module TypeChecker where
     checkTopDef (TopFunDef _ (FnDef pos typ name args block)) = do
         env <- ask
         env' <- foldM insertArg env args
-        ret <- local (const env') (checkBlock block)
-        case ret of
-            Nothing ->
-                Control.Monad.when (toMyType typ /= MyVoid) $
-                    throwError ("No return, " ++ showPosition pos)
-            Just (typ', _) ->
-                Control.Monad.when (toMyType typ /= typ') $
-                    throwError ("Wrong return type, " ++ showPosition pos)
+        ret <- local (const env') (checkBlock (toMyType typ) block)
+        if ret == False then
+            Control.Monad.when (toMyType typ /= MyVoid) $
+                throwError ("No return, " ++ showPosition pos)
+        else
+            return ()
         where
             insertArg :: Env -> Arg -> TypeCheckerMonad Env
             insertArg env (Ar _ argType (Ident name)) = do
@@ -84,7 +82,7 @@ module TypeChecker where
                 else
                     return $ Data.Map.insert (Ident name) (toMyType argType) env
     
-    checkBlock :: Block -> TypeCheckerMonad (Maybe (MyType, BNFC'Position))
-    checkBlock (Blck _ stmts) = do
+    checkBlock :: MyType -> Block -> TypeCheckerMonad Bool
+    checkBlock retType (Blck _ stmts) = do
         env <- ask
-        local (const env) (checkStmts stmts)
+        local (const env) (checkStmts retType stmts)
