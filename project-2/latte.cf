@@ -46,25 +46,25 @@ Init.      Item ::= Ident "=" Expr ;
 
 separator  nonempty Item "," ;
 
-Ass.       Stmt ::= LVal "=" Expr  ";" ;
+Ass.       Stmt ::= LVal "=" Expr ";" ;
 
-Incr.      Stmt ::= LVal "++"  ";" ;
+Incr.      Stmt ::= LVal "++" ";" ;
 
-Decr.      Stmt ::= LVal "--"  ";" ;
+Decr.      Stmt ::= LVal "--" ";" ;
 
 Ret.       Stmt ::= "return" Expr ";" ;
 
 VRet.      Stmt ::= "return" ";" ;
 
-Cond.      Stmt ::= "if" "(" Expr ")" Stmt  ;
+Cond.      Stmt ::= "if" "(" Expr ")" Stmt ;
 
-CondElse.  Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt  ;
+CondElse.  Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt ;
 
 While.     Stmt ::= "while" "(" Expr ")" Stmt ;
 
 ForEach.   Stmt ::= "for" "(" Type Ident ":" Expr ")" Stmt ;
 
-SExp.      Stmt ::= Expr  ";" ;
+SExp.      Stmt ::= Expr ";" ;
 
 -- lvalues -------------------------------------------------
 
