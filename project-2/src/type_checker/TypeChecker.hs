@@ -11,12 +11,12 @@ module TypeChecker where
     checkProgram :: Program -> TypeCheckerMonad ()
     checkProgram (Prog _ topDefs) = do
         let env = Data.Map.fromList [
-                (Ident "readInt", MyFun MyInt []),
-                (Ident "readString", MyFun MyStr []),
-                (Ident "readBool", MyFun MyBool []),
-                (Ident "printInt", MyFun MyVoid [MyInt]),
-                (Ident "printString", MyFun MyVoid [MyStr]),
-                (Ident "printBool", MyFun MyVoid [MyBool])]
+                (Ident "readInt", (MyFun MyInt [], 0)),
+                (Ident "readString", (MyFun MyStr [], 0)),
+                (Ident "readBool", (MyFun MyBool [], 0)),
+                (Ident "printInt", (MyFun MyVoid [MyInt], 0)),
+                (Ident "printString", (MyFun MyVoid [MyStr], 0)),
+                (Ident "printBool", (MyFun MyVoid [MyBool], 0))]
         env' <- local (const env) (getEnv topDefs)
         local (const env') (checkTopDefs topDefs)
     
@@ -26,7 +26,7 @@ module TypeChecker where
         let tmp = Data.Map.lookup (Ident "main") env
         case tmp of
             Nothing -> throwError "'main' is not defined"
-            Just (MyFun MyInt []) -> return env
+            Just (MyFun MyInt [], _) -> return env
             _ -> throwError "'main' must be a no-argument function that returns int"
     getEnv (topDef : topDefs) = do
         env <- insertTopDef topDef
@@ -61,14 +61,14 @@ module TypeChecker where
             throwError ("Argument cannot be of type void, " ++ showPosition pos)
         else do
             let expectedType = toMyType typ
-                env' = Data.Map.insert name (MyFun expectedType (Prelude.map argToType args)) env
+                env' = Data.Map.insert name (MyFun expectedType (Prelude.map argToType args), 0) env
             return env'
     
     checkTopDef :: TopDef -> TypeCheckerMonad ()
     checkTopDef (TopFunDef _ (FnDef pos typ name args block)) = do
         env <- ask
         env' <- foldM insertArg env args
-        ret <- local (const env') (checkBlock (toMyType typ) block)
+        ret <- local (const env') (checkBlock 1 (toMyType typ) block)
         if ret == False then
             Control.Monad.when (toMyType typ /= MyVoid) $
                 throwError ("No return, " ++ showPosition pos)
@@ -77,12 +77,9 @@ module TypeChecker where
         where
             insertArg :: Env -> Arg -> TypeCheckerMonad Env
             insertArg env (Ar _ argType (Ident name)) = do
-                if Data.Map.member (Ident name) env then
-                    throwError ("Argument " ++ name ++ " already declared, " ++ showPosition pos)
-                else
-                    return $ Data.Map.insert (Ident name) (toMyType argType) env
+                return $ Data.Map.insert (Ident name) ((toMyType argType, 1)) env
     
-    checkBlock :: MyType -> Block -> TypeCheckerMonad Bool
-    checkBlock retType (Blck _ stmts) = do
+    checkBlock :: Integer -> MyType -> Block -> TypeCheckerMonad Bool
+    checkBlock depth retType (Blck _ stmts) = do
         env <- ask
-        local (const env) (checkStmts retType stmts)
+        local (const env) (checkStmts depth retType stmts)

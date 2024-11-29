@@ -11,7 +11,7 @@ module ExprChecker where
     getTypeFromEnv pos (Ident name) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
-            Just typ -> return typ
+            Just (typ, _) -> return typ
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
     
     getExprType :: Expr -> TypeCheckerMonad MyType

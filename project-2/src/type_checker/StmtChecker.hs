@@ -6,80 +6,84 @@ module StmtChecker where
     import Data.Map
     import ExprChecker
     
-    checkStmts :: MyType -> [Stmt] -> TypeCheckerMonad Bool
+    checkStmts :: Integer -> MyType -> [Stmt] -> TypeCheckerMonad Bool
     
-    checkStmts retType [] = do
+    checkStmts _ retType [] = do
         return False
     
-    checkStmts retType (stmt : stmts) = do
+    checkStmts depth retType (stmt : stmts) = do
         env <- ask
-        (env', ret1) <- local (const env) (checkStmt retType stmt)
-        ret2 <- local (const env') (checkStmts retType stmts)
+        (env', ret1) <- local (const env) (checkStmt depth retType stmt)
+        ret2 <- local (const env') (checkStmts depth retType stmts)
         return (ret1 || ret2)
     
-    checkStmt :: MyType -> Stmt -> TypeCheckerMonad (Env, Bool)
+    checkStmt :: Integer -> MyType -> Stmt -> TypeCheckerMonad (Env, Bool)
     
-    checkStmt _ (Empty _) = do
+    checkStmt _ _ (Empty _) = do
         env <- ask
         return (env, False)
     
-    checkStmt retType (BStmt _ (Blck _ stmts)) = do
+    checkStmt depth retType (BStmt _ (Blck _ stmts)) = do
         env <- ask
-        ret <- local (const env) (checkStmts retType stmts)
+        ret <- local (const env) (checkStmts (depth + 1) retType stmts)
         return (env, ret)
     
-    checkStmt _ (Decl _ typ vars) = do
+    checkStmt depth _ (Decl _ typ vars) = do
         env <- ask
-        env' <- foldM insertVar env vars
+        env' <- foldM (insertVar depth) env vars
         return (env', False)
         where
-            insertVar :: Env -> Item -> TypeCheckerMonad Env
-            insertVar env (NoInit pos (Ident name)) = do
+            insertVar :: Integer -> Env -> Item -> TypeCheckerMonad Env
+            insertVar depth env (NoInit pos (Ident name)) =
+                checkAlreadyDeclared depth env (Ident name) pos >>= \_ ->
+                    return $ Data.Map.insert (Ident name) (toMyType typ, depth) env
+            insertVar depth env (Init pos (Ident name) expr) =
+                checkAlreadyDeclared depth env (Ident name) pos >>= \_ -> do
+                    exprType <- getExprType expr
+                    if exprType /= toMyType typ then
+                        throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
+                    else
+                        return $ Data.Map.insert (Ident name) (toMyType typ, depth) env
+            checkAlreadyDeclared :: Integer -> Env -> Ident -> BNFC'Position -> TypeCheckerMonad ()
+            checkAlreadyDeclared depth env (Ident name) pos =
                 case Data.Map.lookup (Ident name) env of
-                    Just _ -> throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
-                    Nothing -> return $ Data.Map.insert (Ident name) (toMyType typ) env
-            insertVar env (Init pos (Ident name) expr) = do
-                case Data.Map.lookup (Ident name) env of
-                    Just _ -> throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
-                    Nothing -> do
-                        exprType <- getExprType expr
-                        if exprType /= toMyType typ then
-                            throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
-                        else
-                            return $ Data.Map.insert (Ident name) (toMyType typ) env
+                    Just (_, depth') ->
+                        when (depth == depth') $
+                            throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
+                    Nothing -> return ()
     
-    checkStmt _ (Ass _ (LVar pos (Ident name)) expr) = do
+    checkStmt _ _ (Ass _ (LVar pos (Ident name)) expr) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
-            Just varType -> do
+            Just (varType, _) -> do
                 exprType <- getExprType expr
                 if exprType /= varType then
                     throwError ("Type mismatch in assignment to " ++ name ++ ", " ++ showPosition pos)
                 else
                     return (env, False)
     
-    checkStmt _ (Incr _ (LVar pos (Ident name))) = do
+    checkStmt _ _ (Incr _ (LVar pos (Ident name))) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
-            Just varType -> do
+            Just (varType, _) -> do
                 if varType /= MyInt then
                     throwError ("Variable " ++ name ++ " is not an integer, " ++ showPosition pos)
                 else
                     return (env, False)
     
-    checkStmt _ (Decr _ (LVar pos (Ident name))) = do
+    checkStmt _ _ (Decr _ (LVar pos (Ident name))) = do
         env <- ask
         case Data.Map.lookup (Ident name) env of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
-            Just varType -> do
+            Just (varType, _) -> do
                 if varType /= MyInt then
                     throwError ("Variable " ++ name ++ " is not an integer, " ++ showPosition pos)
                 else
                     return (env, False)
     
-    checkStmt retType (Ret pos expr) = do
+    checkStmt _ retType (Ret pos expr) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= retType then
@@ -87,42 +91,42 @@ module StmtChecker where
         else
             return (env, True)
     
-    checkStmt retType (VRet pos) = do
+    checkStmt _ retType (VRet pos) = do
         env <- ask
         if retType /= MyVoid then
             throwError ("Wrong return type, " ++ showPosition pos)
         else
             return (env, True)
     
-    checkStmt retType (Cond pos expr stmt) = do
+    checkStmt depth retType (Cond pos expr stmt) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt retType stmt)
+            (_, _) <- local (const env) (checkStmt (depth + 1) retType stmt)
             return (env, False)
     
-    checkStmt retType (CondElse pos expr stmt1 stmt2) = do
+    checkStmt depth retType (CondElse pos expr stmt1 stmt2) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, ret1) <- local (const env) (checkStmt retType stmt1)
-            (_, ret2) <- local (const env) (checkStmt retType stmt2)
+            (_, ret1) <- local (const env) (checkStmt (depth + 1) retType stmt1)
+            (_, ret2) <- local (const env) (checkStmt (depth + 1) retType stmt2)
             return (env, ret1 && ret2)
     
-    checkStmt retType (While pos expr stmt) = do
+    checkStmt depth retType (While pos expr stmt) = do
         env <- ask
         exprType <- getExprType expr
         if exprType /= MyBool then
             throwError ("Condition in 'while' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt retType stmt)
+            (_, _) <- local (const env) (checkStmt (depth + 1) retType stmt)
             return (env, False)
     
-    checkStmt _ (SExp _ expr) = do
+    checkStmt _ _ (SExp _ expr) = do
         env <- ask
         _ <- getExprType expr
         return (env, False)

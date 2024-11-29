@@ -15,7 +15,7 @@ module Common where
     argToType :: Arg -> MyType
     argToType (Ar _ typ _) = toMyType typ
     
-    type Env = Data.Map.Map Ident MyType
+    type Env = Data.Map.Map Ident (MyType, Integer)
     
     type TypeCheckerMonad = ReaderT Env (ExceptT String IO)
     
