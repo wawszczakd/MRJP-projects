@@ -1,13 +1,10 @@
 module Main where
     import Control.Monad.Except
     import Control.Monad.Reader
-    import Control.Monad.State
     import Data.Map
     import ParLatte
     import System.Environment
     import System.Exit
-    import System.FilePath
-    import System.IO
     import TypeChecker
     
     main :: IO ()
