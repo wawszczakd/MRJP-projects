@@ -72,17 +72,31 @@ module ExprChecker where
             Minus _ -> handleSub exprType1 exprType2
         where
             handleAdd MyInt MyInt = return MyInt
-            handleAdd _ _ = throwError ("'+' requires both operands to be ints, " ++ (showPosition pos))
+            handleAdd MyStr MyStr = return MyStr
+            handleAdd _ _ = throwError ("'+' requires both operands to be ints or both to be strings, " ++ (showPosition pos))
             handleSub MyInt MyInt = return MyInt
             handleSub _ _ = throwError ("'-' requires both operands to be ints, " ++ (showPosition pos))
+
     
     getExprType (ERel pos expr1 op expr2) = do
         exprType1 <- getExprType expr1
         exprType2 <- getExprType expr2
-        if exprType1 == MyInt && exprType2 == MyInt then
-            return MyBool
-        else
-            throwError ("Comparison requires both operands to be ints, " ++ (showPosition pos))
+        case op of
+            LTH _    -> checkRelOp "<" exprType1 exprType2
+            LE _     -> checkRelOp "<=" exprType1 exprType2
+            GTH _    -> checkRelOp ">" exprType1 exprType2
+            GE _     -> checkRelOp ">=" exprType1 exprType2
+            EQU _     -> checkEquality exprType1 exprType2
+            NE _    -> checkEquality exprType1 exprType2
+        where
+            checkRelOp :: String -> MyType -> MyType -> TypeCheckerMonad MyType
+            checkRelOp opName MyInt MyInt = return MyBool
+            checkRelOp opName _ _ = throwError (opName ++ " requires both operands to be ints, " ++ showPosition pos)
+            checkEquality :: MyType -> MyType -> TypeCheckerMonad MyType
+            checkEquality MyInt MyInt = return MyBool
+            checkEquality MyStr MyStr = return MyBool
+            checkEquality MyBool MyBool = return MyBool
+            checkEquality _ _ = throwError ("'==' or '!=' requires both operands to be of the same type, " ++ showPosition pos)
     
     getExprType (EAnd pos expr1 expr2) = do
         exprType1 <- getExprType expr1

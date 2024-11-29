@@ -43,16 +43,18 @@ module StmtChecker where
         where
             insertVar :: Env -> Item -> TypeCheckerMonad Env
             insertVar env (NoInit pos (Ident name)) = do
-                if Data.Map.member (Ident name) env then
-                    throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
-                else
-                    return $ Data.Map.insert (Ident name) (toMyType typ) env
+                case Data.Map.lookup (Ident name) env of
+                    Just _ -> throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
+                    Nothing -> return $ Data.Map.insert (Ident name) (toMyType typ) env
             insertVar env (Init pos (Ident name) expr) = do
-                exprType <- getExprType expr
-                if exprType /= toMyType typ then
-                    throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
-                else
-                    return $ Data.Map.insert (Ident name) (toMyType typ) env
+                case Data.Map.lookup (Ident name) env of
+                    Just _ -> throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
+                    Nothing -> do
+                        exprType <- getExprType expr
+                        if exprType /= toMyType typ then
+                            throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
+                        else
+                            return $ Data.Map.insert (Ident name) (toMyType typ) env
     
     checkStmt (Ass _ (LVar pos (Ident name)) expr) = do
         env <- ask
@@ -109,9 +111,15 @@ module StmtChecker where
         if exprType /= MyBool then
             throwError ("Condition in 'if' statement must be a bool, " ++ showPosition pos)
         else do
-            (_, _) <- local (const env) (checkStmt stmt1)
-            (_, _) <- local (const env) (checkStmt stmt2)
-            return (env, Nothing)
+            (_, ret1) <- local (const env) (checkStmt stmt1)
+            (_, ret2) <- local (const env) (checkStmt stmt2)
+            case (ret1, ret2) of
+                (Just (typ1, _), Just (typ2, _)) -> do
+                    if typ1 /= typ2 then
+                        throwError ("Return types do not match, " ++ showPosition pos)
+                    else
+                        return (env, Just (typ1, pos))
+                (_, _) -> return (env, Nothing)
     
     checkStmt (While pos expr stmt) = do
         env <- ask

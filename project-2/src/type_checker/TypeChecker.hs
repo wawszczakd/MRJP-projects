@@ -10,8 +10,15 @@ module TypeChecker where
     
     checkProgram :: Program -> TypeCheckerMonad ()
     checkProgram (Prog _ topDefs) = do
-        env <- getEnv topDefs
-        local (const env) (checkTopDefs topDefs)
+        let env = Data.Map.fromList [
+                (Ident "readInt", MyFun MyInt []),
+                (Ident "readString", MyFun MyStr []),
+                (Ident "readBool", MyFun MyBool []),
+                (Ident "printInt", MyFun MyVoid [MyInt]),
+                (Ident "printString", MyFun MyVoid [MyStr]),
+                (Ident "printBool", MyFun MyVoid [MyBool])]
+        env' <- local (const env) (getEnv topDefs)
+        local (const env') (checkTopDefs topDefs)
     
     getEnv :: [TopDef] -> TypeCheckerMonad Env
     getEnv [] = do
@@ -60,14 +67,22 @@ module TypeChecker where
     checkTopDef :: TopDef -> TypeCheckerMonad ()
     checkTopDef (TopFunDef _ (FnDef pos typ name args block)) = do
         env <- ask
-        ret <- local (const env) (checkBlock block)
+        env' <- foldM insertArg env args
+        ret <- local (const env') (checkBlock block)
         case ret of
             Nothing ->
                 Control.Monad.when (toMyType typ /= MyVoid) $
-                throwError ("No return, " ++ showPosition pos)
-            (Just (typ', _)) ->
+                    throwError ("No return, " ++ showPosition pos)
+            Just (typ', _) ->
                 Control.Monad.when (toMyType typ /= typ') $
-                throwError ("Wrong return type, " ++ showPosition pos)
+                    throwError ("Wrong return type, " ++ showPosition pos)
+        where
+            insertArg :: Env -> Arg -> TypeCheckerMonad Env
+            insertArg env (Ar _ argType (Ident name)) = do
+                if Data.Map.member (Ident name) env then
+                    throwError ("Argument " ++ name ++ " already declared, " ++ showPosition pos)
+                else
+                    return $ Data.Map.insert (Ident name) (toMyType argType) env
     
     checkBlock :: Block -> TypeCheckerMonad (Maybe (MyType, BNFC'Position))
     checkBlock (Blck _ stmts) = do
