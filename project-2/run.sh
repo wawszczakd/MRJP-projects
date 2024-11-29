@@ -20,5 +20,5 @@ for file in "$folder"/*.lat; do
     fi
     
     echo -ne "\nProcessing $file...\n"
-    ./latte "$file"
+    ./latc "$file"
 done

@@ -5,7 +5,7 @@ version:            0.1.0.0
 author:             Dominik Wawszczak
 maintainer:         Dominik Wawszczak
 
-executable latte
+executable latc
     main-is: Main.hs
     
     other-modules:
