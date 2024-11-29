@@ -8,8 +8,7 @@ module StmtChecker where
     
     checkStmts :: Integer -> MyType -> [Stmt] -> TypeCheckerMonad Bool
     
-    checkStmts _ retType [] = do
-        return False
+    checkStmts _ retType [] = return False
     
     checkStmts depth retType (stmt : stmts) = do
         env <- ask
@@ -35,15 +34,14 @@ module StmtChecker where
         where
             insertVar :: Integer -> Env -> Item -> TypeCheckerMonad Env
             insertVar depth env (NoInit pos (Ident name)) =
-                checkAlreadyDeclared depth env (Ident name) pos >>= \_ ->
-                    return $ Data.Map.insert (Ident name) (toMyType typ, depth) env
+                checkAlreadyDeclared depth env (Ident name) pos >> return (Data.Map.insert (Ident name) (toMyType typ, depth) env)
             insertVar depth env (Init pos (Ident name) expr) =
-                checkAlreadyDeclared depth env (Ident name) pos >>= \_ -> do
+                checkAlreadyDeclared depth env (Ident name) pos >> (do
                     (exprType, _) <- getExprType expr
                     if exprType /= toMyType typ then
                         throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
                     else
-                        return $ Data.Map.insert (Ident name) (toMyType typ, depth) env
+                        return $ Data.Map.insert (Ident name) (toMyType typ, depth) env)
             checkAlreadyDeclared :: Integer -> Env -> Ident -> BNFC'Position -> TypeCheckerMonad ()
             checkAlreadyDeclared depth env (Ident name) pos =
                 case Data.Map.lookup (Ident name) env of
