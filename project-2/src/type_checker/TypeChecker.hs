@@ -6,7 +6,7 @@ module TypeChecker where
     import Control.Monad.Reader
     import Data.Map
     import Data.List
-    import StatementChecker
+    import StmtChecker
     
     checkProgram :: Program -> TypeCheckerMonad ()
     checkProgram (Prog _ topDefs) = do
@@ -63,9 +63,11 @@ module TypeChecker where
         ret <- local (const env) (checkBlock block)
         case ret of
             Nothing ->
-                Control.Monad.when (toMyType typ /= MyVoid) $ throwError ("No return, " ++ showPosition pos)
+                Control.Monad.when (toMyType typ /= MyVoid) $
+                throwError ("No return, " ++ showPosition pos)
             (Just (typ', _)) ->
-                Control.Monad.when (toMyType typ /= typ') $ throwError ("Wrong return type, " ++ showPosition pos)
+                Control.Monad.when (toMyType typ /= typ') $
+                throwError ("Wrong return type, " ++ showPosition pos)
     
     checkBlock :: Block -> TypeCheckerMonad (Maybe (MyType, BNFC'Position))
     checkBlock (Blck _ stmts) = do

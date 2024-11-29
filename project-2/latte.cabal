@@ -11,9 +11,10 @@ executable latte
     other-modules:
         AbsLatte,
         Common,
+        ExprChecker,
         LexLatte,
         ParLatte,
-        StatementChecker,
+        StmtChecker,
         TypeChecker
     
     build-depends:
