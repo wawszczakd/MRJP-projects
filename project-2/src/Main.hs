@@ -27,6 +27,7 @@ module Main where
                         case res of
                             Right () -> do
                                 putStrLn "Type checking successful."
+                                print program
                                 
                                 let
                                     code = compileProgram program

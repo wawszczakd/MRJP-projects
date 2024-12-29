@@ -1,12 +1,12 @@
 module TypeChecker where
     import AbsLatte
-    import Common
     import Control.Monad
     import Control.Monad.Except
     import Control.Monad.Reader
     import Data.Map
     import Data.List
     import StmtChecker
+    import UtilsTypeChecker
     
     checkProgram :: Program -> TypeCheckerMonad ()
     checkProgram (Prog _ topDefs) = do

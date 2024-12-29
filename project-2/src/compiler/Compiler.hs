@@ -1,13 +1,9 @@
 module Compiler where
+    import AbsLatte
+    import Control.Monad.State
     import Data.List
     import Data.Map
-    import Control.Monad.State
-    import AbsLatte
-    
-    -- (next available register, map of variables to a pair (allocated register, loaded register)) --
-    type StateMonad = State (Integer, Data.Map.Map String (Integer, Integer))
-    
-    data ExprVal = Num Integer | Reg Integer
+    import UtilsCompiler
     
     compileProgram :: Program -> String
     compileProgram (Prog _ topDefs) =
@@ -20,7 +16,7 @@ module Compiler where
         in
             unlines (programHead ++ programBody)
     
-    compileTopDef :: TopDef -> StateMonad [String]
+    compileTopDef :: TopDef -> CompilerMonad [String]
     compileTopDef (TopFunDef _ (FnDef _ typ (Ident name) args block)) = do
         let retType = compileType typ
         let funcName = name
@@ -30,21 +26,11 @@ module Compiler where
         let funcFooter = "}"
         return $ funcHeader : funcBody ++ [funcFooter]
     
-    compileArg :: Arg -> String
-    compileArg (Ar _ typ (Ident argName)) =
-        compileType typ ++ " %" ++ argName
-    
-    compileType :: Type -> String
-    compileType (Int _) = "i32"
-    compileType (Str _) = "i8*"
-    compileType (Bool _) = "i1"
-    compileType (Void _) = "void"
-    
-    compileBlock :: Block -> StateMonad [String]
-    compileBlock _ = do
+    compileBlock :: Block -> CompilerMonad [String]
+    compileBlock (Blck _ stmts) = do
         return ["    ; Function body goes here", "    ret i32 0"]
     
-    compileTopDefs :: [TopDef] -> StateMonad [String]
+    compileTopDefs :: [TopDef] -> CompilerMonad [String]
     compileTopDefs topDefs = do
         foldM (\acc topDef -> do
                     topDefCode <- compileTopDef topDef

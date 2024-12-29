@@ -1,4 +1,4 @@
-module Common where
+module UtilsTypeChecker where
     import AbsLatte
     import Control.Monad.Except
     import Control.Monad.Reader

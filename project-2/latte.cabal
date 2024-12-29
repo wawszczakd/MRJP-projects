@@ -10,13 +10,14 @@ executable latc_llvm
     
     other-modules:
         AbsLatte,
-        Common,
         Compiler,
         ExprChecker,
         LexLatte,
         ParLatte,
         StmtChecker,
-        TypeChecker
+        TypeChecker,
+        UtilsCompiler,
+        UtilsTypeChecker
     
     build-depends:
         array      ^>= 0.5.4.0,

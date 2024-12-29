@@ -4,8 +4,8 @@ module ExprChecker where
     import AbsLatte
     import Control.Monad.Except
     import Control.Monad.Reader
-    import Common
     import Data.Map
+    import UtilsTypeChecker
     
     getTypeFromEnv :: BNFC'Position -> Ident -> TypeCheckerMonad MyType
     getTypeFromEnv pos (Ident name) = do

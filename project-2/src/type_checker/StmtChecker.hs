@@ -1,10 +1,10 @@
 module StmtChecker where
     import AbsLatte
-    import Common
     import Control.Monad.Except
     import Control.Monad.Reader
     import Data.Map
     import ExprChecker
+    import UtilsTypeChecker
     
     checkStmts :: Integer -> MyType -> [Stmt] -> TypeCheckerMonad Bool
     
