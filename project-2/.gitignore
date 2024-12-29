@@ -1,2 +1,4 @@
 dist-newstyle
 latc_llvm
+*.bc
+*.ll

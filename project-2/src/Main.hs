@@ -4,6 +4,7 @@ module Main where
     import Control.Monad.Reader
     import Data.Map
     import ParLatte
+    import System.Directory
     import System.Environment
     import System.Exit
     import System.FilePath
@@ -25,17 +26,22 @@ module Main where
                         res <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
                         case res of
                             Right () -> do
-                                putStrLn "Type checking succesful."
-                                print program
+                                putStrLn "Type checking successful."
                                 let
                                     code = compileProgram program
                                     llFile = replaceExtension file "ll"
                                     bcFile = replaceExtension file "bc"
                                 writeFile llFile code
                                 putStrLn $ "LLVM code has been written to " ++ llFile
-                                _ <- system $ "llvm-as " ++ llFile ++ " -o " ++ bcFile
+                                
+                                exeDir <- takeDirectory <$> getExecutablePath
+                                let runtimePath = exeDir </> "lib/runtime.bc"
+                                
+                                _ <- system $ "llvm-as " ++ llFile ++ " -o tmp.bc"
+                                _ <- system $ "llvm-link tmp.bc " ++ runtimePath ++ " -o " ++ bcFile
+                                _ <- system "rm tmp.bc"
                                 putStrLn $ "Generated: " ++ bcFile
                             Left err -> putStrLn $ "Type checking failed: " ++ err
             _ -> do
-                putStrLn "Invalid usage! Give a file as an argument."
+                putStrLn "Invalid usage! Provide a file as an argument."
                 exitFailure
