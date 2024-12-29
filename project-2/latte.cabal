@@ -5,12 +5,13 @@ version:            0.1.0.0
 author:             Dominik Wawszczak
 maintainer:         Dominik Wawszczak
 
-executable latc
+executable latc_llvm
     main-is: Main.hs
     
     other-modules:
         AbsLatte,
         Common,
+        Compiler,
         ExprChecker,
         LexLatte,
         ParLatte,
@@ -22,6 +23,7 @@ executable latc
         base       ^>= 4.15.1.0,
         containers ^>= 0.7,
         filepath   ^>= 1.4.2.1,
-        mtl        ^>= 2.2.2
-    hs-source-dirs:   src, src/bnfc, src/type_checker
+        mtl        ^>= 2.2.2,
+        process    ^>= 1.6.13.2
+    hs-source-dirs:   src, src/bnfc, src/compiler, src/type_checker
     default-language: Haskell2010

@@ -75,7 +75,7 @@ module TypeChecker where
         where
             insertArg :: Env -> Arg -> TypeCheckerMonad Env
             insertArg env (Ar _ argType (Ident name)) = return $ Data.Map.insert (Ident name) (toMyType argType, 1) env
-
+    
     checkBlock :: Integer -> MyType -> Block -> TypeCheckerMonad Bool
     checkBlock depth retType (Blck _ stmts) = do
         env <- ask

@@ -1,10 +1,13 @@
 module Main where
+    import Compiler
     import Control.Monad.Except
     import Control.Monad.Reader
     import Data.Map
     import ParLatte
     import System.Environment
     import System.Exit
+    import System.FilePath
+    import System.Process
     import TypeChecker
     
     main :: IO ()
@@ -21,7 +24,17 @@ module Main where
                     (Right program) -> do
                         res <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
                         case res of
-                            Right () -> putStrLn "Type checking succesful."
+                            Right () -> do
+                                putStrLn "Type checking succesful."
+                                print program
+                                let
+                                    code = compileProgram program
+                                    llFile = replaceExtension file "ll"
+                                    bcFile = replaceExtension file "bc"
+                                writeFile llFile code
+                                putStrLn $ "LLVM code has been written to " ++ llFile
+                                _ <- system $ "llvm-as " ++ llFile ++ " -o " ++ bcFile
+                                putStrLn $ "Generated: " ++ bcFile
                             Left err -> putStrLn $ "Type checking failed: " ++ err
             _ -> do
                 putStrLn "Invalid usage! Give a file as an argument."
