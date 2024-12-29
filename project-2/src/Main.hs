@@ -27,6 +27,7 @@ module Main where
                         case res of
                             Right () -> do
                                 putStrLn "Type checking successful."
+                                
                                 let
                                     code = compileProgram program
                                     llFile = replaceExtension file "ll"
@@ -37,9 +38,7 @@ module Main where
                                 exeDir <- takeDirectory <$> getExecutablePath
                                 let runtimePath = exeDir </> "lib/runtime.bc"
                                 
-                                _ <- system $ "llvm-as " ++ llFile ++ " -o tmp.bc"
-                                _ <- system $ "llvm-link tmp.bc " ++ runtimePath ++ " -o " ++ bcFile
-                                _ <- system "rm tmp.bc"
+                                _ <- system $ "llvm-link " ++ llFile ++ " " ++ runtimePath ++ " -o " ++ bcFile
                                 putStrLn $ "Generated: " ++ bcFile
                             Left err -> putStrLn $ "Type checking failed: " ++ err
             _ -> do
