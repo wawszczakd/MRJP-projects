@@ -8,6 +8,10 @@ module UtilsTypeChecker where
     
     data ValueState = FixedInt Integer | FixedBool Bool | FixedString String | Unknown
     
+    type Env = Data.Map.Map Ident (MyType, Integer)
+    
+    type TypeCheckerMonad = ReaderT Env (ExceptT String IO)
+    
     toMyType :: Type -> MyType
     toMyType (Int _) = MyInt
     toMyType (Str _) = MyStr
@@ -16,10 +20,6 @@ module UtilsTypeChecker where
     
     argToType :: Arg -> MyType
     argToType (Ar _ typ _) = toMyType typ
-    
-    type Env = Data.Map.Map Ident (MyType, Integer)
-    
-    type TypeCheckerMonad = ReaderT Env (ExceptT String IO)
     
     showPosition :: Maybe (Int, Int) -> String
     showPosition Nothing = "position unknown"

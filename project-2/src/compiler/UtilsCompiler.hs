@@ -3,10 +3,16 @@ module UtilsCompiler where
     import Control.Monad.State
     import Data.Map
     
-    -- (next available register, map of variables to a pair (allocated register, loaded register)) --
-    type CompilerMonad = State (Integer, Data.Map.Map String (Integer, Integer))
+    data EnvEntry
+        = VarEntry { allocReg :: Integer, loadReg :: Integer }
+        | FuncEntry { retType :: String }
     
-    data ExprVal = Num Integer | Reg Integer
+    -- (next available register, environment map) --
+    type Env = (Integer, Data.Map.Map Ident EnvEntry)
+    
+    type CompilerMonad = State Env
+    
+    data ExprVal = In Integer | Bo Bool | St String | Re Integer
     
     compileArg :: Arg -> String
     compileArg (Ar _ typ (Ident argName)) =

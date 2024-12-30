@@ -12,9 +12,11 @@ executable latc_llvm
         AbsLatte,
         Compiler,
         ExprChecker,
+        ExprCompiler,
         LexLatte,
         ParLatte,
         StmtChecker,
+        StmtCompiler,
         TypeChecker,
         UtilsCompiler,
         UtilsTypeChecker

@@ -17,17 +17,16 @@ module Main where
         case args of
             [file] -> do
                 input <- readFile file
-                let result = pProgram $ myLexer input
-                case result of
+                let parsingResult = pProgram $ myLexer input
+                case parsingResult of
                     (Left err) -> do
                         putStrLn err
                         exitFailure
                     (Right program) -> do
-                        res <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
-                        case res of
+                        typeCheckingResult <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
+                        case typeCheckingResult of
                             Right () -> do
                                 putStrLn "Type checking successful."
-                                print program
                                 
                                 let
                                     code = compileProgram program
