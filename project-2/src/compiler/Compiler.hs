@@ -9,7 +9,7 @@ module Compiler where
     compileProgram :: Program -> String
     compileProgram (Prog _ topDefs) =
         let
-            (_, envWithFuncs) = runState (insertFuncs topDefs) (0, 0, Data.Map.empty, Data.Map.empty)
+            (_, envWithFuncs) = runState (insertFuncs topDefs) (1, 1, Data.Map.empty, Data.Map.empty)
             (programBody, _) = runState (compileTopDefs topDefs) envWithFuncs
             programHead = [ "declare i32 @readInt()"
                           , "declare i8* @readString()"

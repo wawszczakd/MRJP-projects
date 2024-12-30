@@ -34,14 +34,16 @@ module StmtChecker where
         where
             insertVar :: Integer -> Env -> Item -> TypeCheckerMonad Env
             insertVar depth env (NoInit pos (Ident name)) =
-                checkAlreadyDeclared depth env (Ident name) pos >> return (Data.Map.insert (Ident name) (toMyType typ, depth) env)
+                checkAlreadyDeclared depth env (Ident name) pos >>
+                    return (Data.Map.insert (Ident name) (toMyType typ, depth) env)
             insertVar depth env (Init pos (Ident name) expr) =
                 checkAlreadyDeclared depth env (Ident name) pos >> (do
-                    (exprType, _) <- getExprType expr
+                    (exprType, _) <- local (const env) (getExprType expr)
                     if exprType /= toMyType typ then
                         throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
                     else
                         return $ Data.Map.insert (Ident name) (toMyType typ, depth) env)
+            
             checkAlreadyDeclared :: Integer -> Env -> Ident -> BNFC'Position -> TypeCheckerMonad ()
             checkAlreadyDeclared depth env (Ident name) pos =
                 case Data.Map.lookup (Ident name) env of

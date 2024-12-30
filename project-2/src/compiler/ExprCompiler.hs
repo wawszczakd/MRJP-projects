@@ -11,9 +11,8 @@ module ExprCompiler where
     
     compileExpr (EVar _ (LVar _ name)) = do
         (_, _, env, store) <- get
-        let
-            Just (VarEntry loc) = Data.Map.lookup name env
-            Just reg = Data.Map.lookup loc store
+        let Just (VarEntry loc) = Data.Map.lookup name env
+        let Just reg = Data.Map.lookup loc store
         return (Re reg, [])
     
     compileExpr (ELitInt _ val) =
@@ -57,4 +56,93 @@ module ExprCompiler where
             formatArg (Bo True) = "i1 1"
             formatArg (Bo False) = "i1 0"
             formatArg (Re reg) = "i32 %" ++ show reg
-
+    
+    compileExpr (Neg _ expr) = do
+        (exprVal, instrs) <- compileExpr expr
+        case exprVal of
+            In val -> return (In (-val), instrs)
+            Re reg -> do
+                (nextLoc, nextReg, env, store) <- get
+                let negInstr = "    %" ++ show nextReg ++ " = sub i32 0, %" ++ show reg
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs ++ [negInstr])
+    
+    compileExpr (Not _ expr) = do
+        (exprVal, instrs) <- compileExpr expr
+        case exprVal of
+            Bo val -> return (Bo (not val), instrs)
+            Re reg -> do
+                (nextLoc, nextReg, env, store) <- get
+                let notInstr = "    %" ++ show nextReg ++ " = xor i1 1, %" ++ show reg
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs ++ [notInstr])
+    
+    compileExpr (EMul _ expr1 op expr2) = do
+        (exprVal1, instrs1) <- compileExpr expr1
+        (exprVal2, instrs2) <- compileExpr expr2
+        case (exprVal1, exprVal2) of
+            (In val1, In val2) ->
+                case op of
+                    Times _ -> return (In (val1 * val2), instrs1 ++ instrs2)
+                    Div _ -> return (In (val1 `div` val2), instrs1 ++ instrs2)
+                    Mod _ -> return (In (val1 `mod` val2), instrs1 ++ instrs2)
+            
+            (Re reg1, In val2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Times _ -> "    %" ++ show nextReg ++ " = mul i32 %" ++ show reg1 ++ ", " ++ show val2
+                                Div _ -> "    %" ++ show nextReg ++ " = sdiv i32 %" ++ show reg1 ++ ", " ++ show val2
+                                Mod _ -> "    %" ++ show nextReg ++ " = srem i32 %" ++ show reg1 ++ ", " ++ show val2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            
+            (In val1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Times _ -> "    %" ++ show nextReg ++ " = mul i32 " ++ show val1 ++ ", %" ++ show reg2
+                                Div _ -> "    %" ++ show nextReg ++ " = sdiv i32 " ++ show val1 ++ ", %" ++ show reg2
+                                Mod _ -> "    %" ++ show nextReg ++ " = srem i32 " ++ show val1 ++ ", %" ++ show reg2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            
+            (Re reg1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Times _ -> "    %" ++ show nextReg ++ " = mul i32 %" ++ show reg1 ++ ", %" ++ show reg2
+                                Div _ -> "    %" ++ show nextReg ++ " = sdiv i32 %" ++ show reg1 ++ ", %" ++ show reg2
+                                Mod _ -> "    %" ++ show nextReg ++ " = srem i32 %" ++ show reg1 ++ ", %" ++ show reg2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+    
+    compileExpr (EAdd _ expr1 op expr2) = do
+        (exprVal1, instrs1) <- compileExpr expr1
+        (exprVal2, instrs2) <- compileExpr expr2
+        case (exprVal1, exprVal2) of
+            (In val1, In val2) ->
+                case op of
+                    Plus _  -> return (In (val1 + val2), instrs1 ++ instrs2)
+                    Minus _ -> return (In (val1 - val2), instrs1 ++ instrs2)
+            
+            (Re reg1, In val2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Plus _  -> "    %" ++ show nextReg ++ " = add i32 %" ++ show reg1 ++ ", " ++ show val2
+                                Minus _ -> "    %" ++ show nextReg ++ " = sub i32 %" ++ show reg1 ++ ", " ++ show val2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            
+            (In val1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Plus _  -> "    %" ++ show nextReg ++ " = add i32 " ++ show val1 ++ ", %" ++ show reg2
+                                Minus _ -> "    %" ++ show nextReg ++ " = sub i32 " ++ show val1 ++ ", %" ++ show reg2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            
+            (Re reg1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                Plus _  -> "    %" ++ show nextReg ++ " = add i32 %" ++ show reg1 ++ ", %" ++ show reg2
+                                Minus _ -> "    %" ++ show nextReg ++ " = sub i32 %" ++ show reg1 ++ ", %" ++ show reg2
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
