@@ -3,23 +3,20 @@ module UtilsCompiler where
     import Control.Monad.State
     import Data.Map
     
-    data EnvEntry
-        = VarEntry { allocReg :: Integer, loadReg :: Integer }
-        | FuncEntry { retType :: String }
+    -- maps variables to locations and functions to return types --
+    data EnvEntry = VarEntry Integer | FuncEntry String
+    type Env = Data.Map.Map Ident EnvEntry
     
-    -- (next available register, environment map) --
-    type Env = (Integer, Data.Map.Map Ident EnvEntry)
+    -- maps locations to registers --
+    type Store = Data.Map.Map Integer Integer
     
-    type CompilerMonad = State Env
+    -- (next available location, next available register, env, store) --
+    type CompilerMonad = State (Integer, Integer, Env, Store)
     
     data ExprVal = In Integer | Bo Bool | St String | Re Integer
     
-    compileArg :: Arg -> String
-    compileArg (Ar _ typ (Ident argName)) =
-        compileType typ ++ " %" ++ argName
-    
-    compileType :: Type -> String
-    compileType (Int _) = "i32"
-    compileType (Str _) = "i8*"
-    compileType (Bool _) = "i1"
-    compileType (Void _) = "void"
+    typeToLLVM :: Type -> String
+    typeToLLVM (Int _) = "i32"
+    typeToLLVM (Str _) = "i8*"
+    typeToLLVM (Bool _) = "i1"
+    typeToLLVM (Void _) = "void"

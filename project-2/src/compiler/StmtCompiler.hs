@@ -15,16 +15,13 @@ module StmtCompiler where
         return []
     
     compileStmt (BStmt _ (Blck _ stmts)) = do
-        env <- get
+        (_, _, env, _) <- get
         instrs <- compileStmts stmts
-        put env
+        (nextLoc, nextReg, _, store) <- get
+        put (nextLoc, nextReg, env, store)
         return instrs
     
     compileStmt (Decl _ typ vars) =
-        -- env <- ask
-        -- env' <- foldM insertVar env vars
-        -- where
-        --     insertVar :: Env -> Item -> CompilerMonad Env
         return ["    ; Decl stmt"]
     
     compileStmt (Ass _ (LVar _ (Ident name)) expr) =
@@ -37,13 +34,13 @@ module StmtCompiler where
         return ["    ; Decr stmt"]
     
     compileStmt (Ret _ expr) = do
-        (val, exprCode) <- compileExpr expr
+        (val, instrs) <- compileExpr expr
         let retInstr = case val of
                 In intVal -> "    ret i32 " ++ show intVal
                 Bo boolVal -> "    ret i1 " ++ if boolVal then "1" else "0"
                 Re reg -> "    ret i32 %" ++ show reg
                 _ -> error "Unsupported return type"
-        return $ exprCode ++ [retInstr]
+        return $ instrs ++ [retInstr]
     
     compileStmt (VRet _) =
         return ["    ret void"]

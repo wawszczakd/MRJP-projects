@@ -10,9 +10,11 @@ module ExprCompiler where
     compileExpr :: Expr -> CompilerMonad (ExprVal, [String])
     
     compileExpr (EVar _ (LVar _ name)) = do
-        (_, varMap) <- get
-        let Just (VarEntry { allocReg, loadReg }) = Data.Map.lookup name varMap
-        return (Re loadReg, [])
+        (_, _, env, store) <- get
+        let
+            Just (VarEntry loc) = Data.Map.lookup name env
+            Just reg = Data.Map.lookup loc store
+        return (Re reg, [])
     
     compileExpr (ELitInt _ val) =
         return (In val, [])
@@ -24,20 +26,24 @@ module ExprCompiler where
         return (Bo False, [])
     
     compileExpr (EApp _ (LVar _ (Ident name)) args) = do
-        (_, varMap) <- get
-        let Just (FuncEntry retType) = Data.Map.lookup (Ident name) varMap
-        (argVals, argCodes) <- compileArgs args
-        (nextReg, varMap') <- get
-        let argList = intercalate ", " $ Data.List.map formatArg argVals
+        (_, _, env, _) <- get
+        let Just (FuncEntry retType) = Data.Map.lookup (Ident name) env
+        (argVals, instrs) <- compileArgs args
+        (nextLoc, nextReg, _, store) <- get
+        let
+            argList = intercalate ", " $ Data.List.map formatArg argVals
             callInstr
                 | retType == "void" = "    call " ++ retType ++ " @" ++ name ++ "(" ++ argList ++ ")"
                 | otherwise =
                     let callReg = nextReg
                     in "    %" ++ show callReg ++ " = call " ++ retType ++ " @" ++ name ++ "(" ++ argList ++ ")"
-        if retType /= "void"
-            then put (nextReg + 1, varMap')
-            else put (nextReg, varMap')
-        return (if retType == "void" then Re (-1) else Re nextReg, argCodes ++ [callInstr])
+        
+        if retType /= "void" then
+            put (nextLoc, nextReg + 1, env, store)
+        else
+            put (nextLoc, nextReg, env, store)
+        
+        return (if retType == "void" then Re (-1) else Re nextReg, instrs ++ [callInstr])
         where
             compileArgs :: [Expr] -> CompilerMonad ([ExprVal], [String])
             compileArgs [] = return ([], [])
