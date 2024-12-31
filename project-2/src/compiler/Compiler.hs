@@ -61,7 +61,7 @@ module Compiler where
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let
                     newVarEnv = Data.Map.insert name nextLoc varEnv
-                    newStore = Data.Map.insert nextLoc nextReg store
+                    newStore = Data.Map.insert nextLoc (Re nextReg) store
                 put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
             
             formatArg :: Integer -> Integer -> Arg -> String

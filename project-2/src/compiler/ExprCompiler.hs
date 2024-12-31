@@ -12,8 +12,8 @@ module ExprCompiler where
     compileExpr (EVar _ (LVar _ name)) = do
         (_, _, (funEnv, varEnv), store) <- get
         let Just loc = Data.Map.lookup name varEnv
-        let Just reg = Data.Map.lookup loc store
-        return (Re reg, [])
+        let Just val = Data.Map.lookup loc store
+        return (val, [])
     
     compileExpr (ELitInt _ val) =
         return (In val, [])

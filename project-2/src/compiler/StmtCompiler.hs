@@ -30,34 +30,19 @@ module StmtCompiler where
             insertVar typ (NoInit _ name) = do
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
-                    newStore = Data.Map.insert nextLoc nextReg store
-                put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
-                let initInstr = case typ of
-                        (Int _)  -> "    %" ++ show nextReg ++ " = add i32 0, 0"
-                        (Bool _) -> "    %" ++ show nextReg ++ " = add i1 0, 0"
-                        (Str _)  -> "    %" ++ show nextReg ++ " = bitcast i8* null to i8*"
-                return [initInstr]
+                    newStore = case typ of
+                        (Int _)  -> Data.Map.insert nextLoc (In 0) store
+                        (Bool _) -> Data.Map.insert nextLoc (Bo False) store
+                        (Str _)  -> Data.Map.insert nextLoc (St "") store
+                put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
+                return []
             insertVar typ (Init _ name expr) = do
                 (exprVal, instrs) <- compileExpr expr
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
-                case exprVal of
-                    In val -> do
-                        let initInstr = "    %" ++ show nextReg ++ " = add i32 " ++ show val ++ ", 0"
-                        let newVarEnv = Data.Map.insert name nextLoc varEnv
-                            newStore = Data.Map.insert nextLoc nextReg store
-                        put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
-                        return (instrs ++ [initInstr])
-                    Bo val -> do
-                        let initInstr = "    %" ++ show nextReg ++ " = add i1 " ++ (if val then "1" else "0") ++ ", 0"
-                        let newVarEnv = Data.Map.insert name nextLoc varEnv
-                            newStore = Data.Map.insert nextLoc nextReg store
-                        put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
-                        return (instrs ++ [initInstr])
-                    Re reg -> do
-                        let newVarEnv = Data.Map.insert name nextLoc varEnv
-                            newStore = Data.Map.insert nextLoc reg store
-                        put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
-                        return (instrs)
+                let newVarEnv = Data.Map.insert name nextLoc varEnv
+                    newStore = Data.Map.insert nextLoc exprVal store
+                put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
+                return (instrs)
     
     compileStmt (Ass _ (LVar _ (Ident name)) expr) =
         return ["    ; Ass stmt"]
