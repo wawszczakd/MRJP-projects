@@ -37,15 +37,20 @@ module StmtCompiler where
                 put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
                 return []
             insertVar typ (Init _ name expr) = do
-                (exprVal, instrs) <- compileExpr expr
+                (val, instrs) <- compileExpr expr
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
-                    newStore = Data.Map.insert nextLoc exprVal store
+                    newStore = Data.Map.insert nextLoc val store
                 put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
                 return (instrs)
     
-    compileStmt (Ass _ (LVar _ (Ident name)) expr) =
-        return ["    ; Ass stmt"]
+    compileStmt (Ass _ (LVar _ name) expr) = do
+        (val, instrs) <- compileExpr expr
+        (nextLoc, nextReg, (funEnv, varEnv), store) <- get
+        let Just loc = Data.Map.lookup name varEnv
+            newStore = Data.Map.insert loc val store
+        put (nextLoc, nextReg, (funEnv, varEnv), newStore)
+        return instrs
     
     compileStmt (Incr _ (LVar _ (Ident name))) =
         return ["    ; Incr stmt"]

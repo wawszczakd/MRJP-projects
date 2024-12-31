@@ -146,3 +146,56 @@ module ExprCompiler where
                                 Minus _ -> "    %" ++ show nextReg ++ " = sub i32 %" ++ show reg1 ++ ", %" ++ show reg2
                 put (nextLoc, nextReg + 1, env, store)
                 return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+    
+    compileExpr (ERel _ expr1 op expr2) = do
+        (exprVal1, instrs1) <- compileExpr expr1
+        (exprVal2, instrs2) <- compileExpr expr2
+        let cmpInstr cmpOp reg1 reg2 nextReg =
+                "    %" ++ show nextReg ++ " = icmp " ++ cmpOp ++ " i32 %" ++ show reg1 ++ ", %" ++ show reg2
+            cmpInstrImm cmpOp reg val nextReg =
+                "    %" ++ show nextReg ++ " = icmp " ++ cmpOp ++ " i32 %" ++ show reg ++ ", " ++ show val
+            cmpInstrImmReverse cmpOp val reg nextReg =
+                "    %" ++ show nextReg ++ " = icmp " ++ cmpOp ++ " i32 " ++ show val ++ ", %" ++ show reg
+        case (exprVal1, exprVal2) of
+            (In val1, In val2) ->
+                let result = case op of
+                                LTH _ -> val1 < val2
+                                LE _  -> val1 <= val2
+                                GTH _ -> val1 > val2
+                                GE _  -> val1 >= val2
+                                EQU _ -> val1 == val2
+                                NE _  -> val1 /= val2
+                in return (Bo result, instrs1 ++ instrs2)
+            (Re reg1, In val2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                LTH _ -> cmpInstrImm "slt" reg1 val2 nextReg
+                                LE _  -> cmpInstrImm "sle" reg1 val2 nextReg
+                                GTH _ -> cmpInstrImm "sgt" reg1 val2 nextReg
+                                GE _  -> cmpInstrImm "sge" reg1 val2 nextReg
+                                EQU _ -> cmpInstrImm "eq" reg1 val2 nextReg
+                                NE _  -> cmpInstrImm "ne" reg1 val2 nextReg
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            (In val1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                LTH _ -> cmpInstrImmReverse "slt" val1 reg2 nextReg
+                                LE _  -> cmpInstrImmReverse "sle" val1 reg2 nextReg
+                                GTH _ -> cmpInstrImmReverse "sgt" val1 reg2 nextReg
+                                GE _  -> cmpInstrImmReverse "sge" val1 reg2 nextReg
+                                EQU _ -> cmpInstrImmReverse "eq" val1 reg2 nextReg
+                                NE _  -> cmpInstrImmReverse "ne" val1 reg2 nextReg
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
+            (Re reg1, Re reg2) -> do
+                (nextLoc, nextReg, env, store) <- get
+                let instr = case op of
+                                LTH _ -> cmpInstr "slt" reg1 reg2 nextReg
+                                LE _  -> cmpInstr "sle" reg1 reg2 nextReg
+                                GTH _ -> cmpInstr "sgt" reg1 reg2 nextReg
+                                GE _  -> cmpInstr "sge" reg1 reg2 nextReg
+                                EQU _ -> cmpInstr "eq" reg1 reg2 nextReg
+                                NE _  -> cmpInstr "ne" reg1 reg2 nextReg
+                put (nextLoc, nextReg + 1, env, store)
+                return (Re nextReg, instrs1 ++ instrs2 ++ [instr])
