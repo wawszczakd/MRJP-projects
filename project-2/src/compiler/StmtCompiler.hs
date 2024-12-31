@@ -3,14 +3,15 @@ module StmtCompiler where
     import Control.Monad.State
     import Data.Map
     import ExprCompiler
+    import LLVMInstructions
     import UtilsCompiler
     
-    compileStmts :: [Stmt] -> CompilerMonad [String]
+    compileStmts :: [Stmt] -> CompilerMonad [LLVMInstr]
     compileStmts stmts = do
         stmtResults <- mapM compileStmt stmts
         return $ concat stmtResults
     
-    compileStmt :: Stmt -> CompilerMonad [String]
+    compileStmt :: Stmt -> CompilerMonad [LLVMInstr]
     
     compileStmt (Empty _) =
         return []
@@ -26,14 +27,14 @@ module StmtCompiler where
         instrs <- concat <$> mapM (insertVar typ) vars
         return instrs
         where
-            insertVar :: Type -> Item -> CompilerMonad [String]
+            insertVar :: Type -> Item -> CompilerMonad [LLVMInstr]
             insertVar typ (NoInit _ name) = do
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = case typ of
-                        (Int _)  -> Data.Map.insert nextLoc (In 0) store
-                        (Bool _) -> Data.Map.insert nextLoc (Bo False) store
-                        (Str _)  -> Data.Map.insert nextLoc (St "") store
+                        (Int _)  -> Data.Map.insert nextLoc (IntVal 0) store
+                        (Bool _) -> Data.Map.insert nextLoc (BoolVal False) store
+                        (Str _)  -> Data.Map.insert nextLoc (StrVal "") store
                 put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
                 return []
             insertVar typ (Init _ name expr) = do
@@ -53,31 +54,26 @@ module StmtCompiler where
         return instrs
     
     compileStmt (Incr _ (LVar _ (Ident name))) =
-        return ["    ; Incr stmt"]
+        return [LLVMEmpty] -- TODO
     
     compileStmt (Decr _ (LVar _ (Ident name))) =
-        return ["    ; Decr stmt"]
+        return [LLVMEmpty] -- TODO
     
     compileStmt (Ret _ expr) = do
         (val, instrs) <- compileExpr expr
-        let retInstr = case val of
-                In intVal -> "    ret i32 " ++ show intVal
-                Bo boolVal -> "    ret i1 " ++ if boolVal then "1" else "0"
-                Re reg -> "    ret i32 %" ++ show reg
-                _ -> error "Unsupported return type"
-        return $ instrs ++ [retInstr]
+        return $ instrs ++ [LLVMRet val]
     
     compileStmt (VRet _) =
-        return ["    ret void"]
+        return [LLVMRetVoid]
     
     compileStmt (Cond _ expr stmt) =
-        return ["    ; Cond stmt"]
+        return [LLVMEmpty] -- TODO
     
     compileStmt (CondElse _ expr stmt1 stmt2) =
-        return ["    ; CondElse stmt"]
+        return [LLVMEmpty] -- TODO
     
     compileStmt (While _ expr stmt) =
-        return ["    ; While stmt"]
+        return [LLVMEmpty] -- TODO
     
     compileStmt (SExp _ expr) = do
         (_, instrs) <- compileExpr expr

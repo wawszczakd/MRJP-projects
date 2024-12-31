@@ -14,8 +14,8 @@ module Compiler where
             (programBody, _) = runState (compileTopDefs topDefs) envWithFuncs
             programHead = [ LLVMFunDec LLVMInt "readInt" []
                           , LLVMFunDec LLVMStr "readString" []
-                          , LLVMFunDec LLVMVoid "printInt" [LLVMArg LLVMInt (LLVMReg 1)]
-                          , LLVMFunDec LLVMVoid "printString" [LLVMArg LLVMStr (LLVMReg 1)] ]
+                          , LLVMFunDec LLVMVoid "printInt" [LLVMArgDec LLVMInt]
+                          , LLVMFunDec LLVMVoid "printString" [LLVMArgDec LLVMStr] ]
         in
             programHead ++ programBody
     
@@ -47,12 +47,11 @@ module Compiler where
         (nextLoc, nextReg, env, store) <- get
         
         mapM_ insertArg args
-        -- funBody <- compileBlock block
+        funBody <- compileBlock block
         let
-            funcBody = []
             retType = typeToLLVM typ
             llvmArgs = zipWith (formatArg nextReg) [0..] args
-            funDef = LLVMFunDef retType name llvmArgs (funcBody ++ [addReturn typ])
+            funDef = LLVMFunDef retType name llvmArgs (funBody ++ [addReturn typ])
         
         put (nextLoc, nextReg, env, store)
         return $ [funDef]
@@ -62,7 +61,7 @@ module Compiler where
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let
                     newVarEnv = Data.Map.insert name nextLoc varEnv
-                    newStore = Data.Map.insert nextLoc (Re nextReg) store
+                    newStore = Data.Map.insert nextLoc (RegVal (LLVMReg nextReg)) store
                 put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
             
             formatArg :: Integer -> Integer -> Arg -> LLVMArg
@@ -71,9 +70,10 @@ module Compiler where
             
             addReturn :: Type -> LLVMInstr
             addReturn (Void _) = LLVMRetVoid
-            addReturn typ = LLVMRet (typeToLLVM typ) (NumVal 0)
+            addReturn (Int _) = LLVMRet (IntVal 0)
+            addReturn (Bool _) = LLVMRet (BoolVal False)
     
-    compileBlock :: Block -> CompilerMonad [String]
+    compileBlock :: Block -> CompilerMonad [LLVMInstr]
     compileBlock (Blck _ stmts) = do
         (_, _, env, _) <- get
         instrs <- compileStmts stmts
