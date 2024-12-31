@@ -34,6 +34,6 @@ executable latc_llvm
         src,
         src/bnfc,
         src/compiler,
-        src/type_checker
+        src/typeChecker
     
     default-language: Haskell2010

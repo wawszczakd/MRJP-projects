@@ -7,17 +7,24 @@ module ExprChecker where
     import Data.Map
     import UtilsTypeChecker
     
-    getTypeFromEnv :: BNFC'Position -> Ident -> TypeCheckerMonad MyType
-    getTypeFromEnv pos (Ident name) = do
-        env <- ask
-        case Data.Map.lookup (Ident name) env of
+    getVarType :: BNFC'Position -> Ident -> TypeCheckerMonad MyType
+    getVarType pos (Ident name) = do
+        (funEnv, varEnv) <- ask
+        case Data.Map.lookup (Ident name) varEnv of
             Just (typ, _) -> return typ
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
+    
+    getFunType :: BNFC'Position -> Ident -> TypeCheckerMonad MyFun
+    getFunType pos (Ident name) = do
+        (funEnv, varEnv) <- ask
+        case Data.Map.lookup (Ident name) funEnv of
+            Just typ -> return typ
+            Nothing -> throwError ("Function " ++ name ++ " is not declared, " ++ showPosition pos)
     
     getExprType :: Expr -> TypeCheckerMonad (MyType, ValueState)
     
     getExprType (EVar pos (LVar _ name)) = do
-        typ <- getTypeFromEnv pos name
+        typ <- getVarType pos name
         return (typ, Unknown)
     
     getExprType (ELitInt _ val) = return (MyInt, FixedInt val)
@@ -27,15 +34,12 @@ module ExprChecker where
     getExprType (ELitFalse _) = return (MyBool, FixedBool False)
     
     getExprType (EApp pos (LVar _ (Ident name)) args) = do
-        funType <- getTypeFromEnv pos (Ident name)
-        case funType of
-            MyFun typ expectedArgs -> do
-                argsTypes <- mapM (fmap fst . getExprType) args
-                if expectedArgs /= argsTypes then
-                    throwError ("Types do not match, " ++ showPosition pos)
-                else
-                    return (typ, Unknown)
-            _ -> throwError (name ++ " is not callable, " ++ showPosition pos)
+        (MyFun typ expectedArgs) <- getFunType pos (Ident name)
+        argsTypes <- mapM (fmap fst . getExprType) args
+        if expectedArgs /= argsTypes then
+            throwError ("Types do not match, " ++ showPosition pos)
+        else
+            return (typ, Unknown)
     
     getExprType (EString _ val) = return (MyStr, FixedString val)
     

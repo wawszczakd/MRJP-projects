@@ -10,8 +10,8 @@ module ExprCompiler where
     compileExpr :: Expr -> CompilerMonad (ExprVal, [String])
     
     compileExpr (EVar _ (LVar _ name)) = do
-        (_, _, env, store) <- get
-        let Just (VarEntry loc) = Data.Map.lookup name env
+        (_, _, (funEnv, varEnv), store) <- get
+        let Just loc = Data.Map.lookup name varEnv
         let Just reg = Data.Map.lookup loc store
         return (Re reg, [])
     
@@ -25,8 +25,8 @@ module ExprCompiler where
         return (Bo False, [])
     
     compileExpr (EApp _ (LVar _ (Ident name)) args) = do
-        (_, _, env, _) <- get
-        let Just (FuncEntry retType) = Data.Map.lookup (Ident name) env
+        (_, _, (funEnv, varEnv), _) <- get
+        let Just retType = Data.Map.lookup (Ident name) funEnv
         (argVals, instrs) <- compileArgs args
         (nextLoc, nextReg, _, store) <- get
         let
@@ -38,9 +38,9 @@ module ExprCompiler where
                     in "    %" ++ show callReg ++ " = call " ++ retType ++ " @" ++ name ++ "(" ++ argList ++ ")"
         
         if retType /= "void" then
-            put (nextLoc, nextReg + 1, env, store)
+            put (nextLoc, nextReg + 1, (funEnv, varEnv), store)
         else
-            put (nextLoc, nextReg, env, store)
+            put (nextLoc, nextReg, (funEnv, varEnv), store)
         
         return (if retType == "void" then Re (-1) else Re nextReg, instrs ++ [callInstr])
         where

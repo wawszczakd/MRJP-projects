@@ -5,7 +5,7 @@ module UtilsCompiler where
     
     -- maps variables to locations and functions to return types --
     data EnvEntry = VarEntry Integer | FuncEntry String
-    type Env = Data.Map.Map Ident EnvEntry
+    type Env = (Data.Map.Map Ident String, Data.Map.Map Ident Integer)
     
     -- maps locations to registers --
     type Store = Data.Map.Map Integer Integer

@@ -23,7 +23,7 @@ module Main where
                         putStrLn err
                         exitFailure
                     (Right program) -> do
-                        typeCheckingResult <- runExceptT $ runReaderT (checkProgram program) Data.Map.empty
+                        typeCheckingResult <- runExceptT $ runReaderT (checkProgram program) (Data.Map.empty, Data.Map.empty)
                         case typeCheckingResult of
                             Right () -> do
                                 putStrLn "Type checking successful."

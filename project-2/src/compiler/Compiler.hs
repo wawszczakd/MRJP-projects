@@ -9,7 +9,7 @@ module Compiler where
     compileProgram :: Program -> String
     compileProgram (Prog _ topDefs) =
         let
-            (_, envWithFuncs) = runState (insertFuncs topDefs) (1, 1, Data.Map.empty, Data.Map.empty)
+            (_, envWithFuncs) = runState (insertFuncs topDefs) (1, 1, (Data.Map.empty, Data.Map.empty), Data.Map.empty)
             (programBody, _) = runState (compileTopDefs topDefs) envWithFuncs
             programHead = [ "declare i32 @readInt()"
                           , "declare i8* @readString()"
@@ -20,18 +20,18 @@ module Compiler where
     
     insertFuncs :: [TopDef] -> CompilerMonad ()
     insertFuncs topDefs = do
-        let builtInFuncs = [ ("readInt", FuncEntry "i32")
-                           , ("readString", FuncEntry "i8*")
-                           , ("printInt", FuncEntry "void")
-                           , ("printString", FuncEntry "void") ]
-        modify (\(nextLoc, nextReg, env, store) ->
-            (nextLoc, nextReg, Data.List.foldr (\(name, entry) -> Data.Map.insert (Ident name) entry) env builtInFuncs, store))
+        let builtInFuncs = [ ("readInt", "i32")
+                           , ("readString", "i8*")
+                           , ("printInt", "void")
+                           , ("printString", "void") ]
+        modify (\(nextLoc, nextReg, (funEnv, varEnv), store) ->
+            (nextLoc, nextReg, (Data.List.foldr (\(name, entry) -> Data.Map.insert (Ident name) entry) funEnv builtInFuncs, varEnv), store))
         foldM_ (\_ topDef -> do
                 case topDef of
                     TopFunDef _ (FnDef _ typ name _ _) -> do
                         let retType = typeToLLVM typ
-                        modify (\(nextLoc, nextReg, env, store) ->
-                            (nextLoc, nextReg, Data.Map.insert name (FuncEntry retType) env, store))
+                        modify (\(nextLoc, nextReg, (funEnv, varEnv), store) ->
+                            (nextLoc, nextReg, (Data.Map.insert name retType funEnv, varEnv), store))
                     _ -> return ()
                 return ()) () topDefs
     
@@ -58,11 +58,11 @@ module Compiler where
         where
             insertArg :: Arg -> CompilerMonad ()
             insertArg (Ar _ _ name) = do
-                (nextLoc, nextReg, env, store) <- get
+                (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let
-                    newEnv = Data.Map.insert name (VarEntry nextLoc) env
+                    newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = Data.Map.insert nextLoc nextReg store
-                put (nextLoc + 1, nextReg + 1, newEnv, newStore)
+                put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
             
             formatArg :: Integer -> Integer -> Arg -> String
             formatArg curNextReg index (Ar _ typ (Ident name)) =

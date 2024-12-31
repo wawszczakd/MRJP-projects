@@ -4,11 +4,13 @@ module UtilsTypeChecker where
     import Control.Monad.Reader
     import Data.Map
     
-    data MyType = MyInt | MyStr | MyBool | MyVoid | MyFun MyType [MyType] deriving (Eq, Show)
+    data MyType = MyInt | MyStr | MyBool | MyVoid deriving Eq
+    data MyFun = MyFun MyType [MyType]
     
     data ValueState = FixedInt Integer | FixedBool Bool | FixedString String | Unknown
     
-    type Env = Data.Map.Map Ident (MyType, Integer)
+    -- (function map, variable map) --
+    type Env = (Data.Map.Map Ident MyFun, Data.Map.Map Ident (MyType, Integer))
     
     type TypeCheckerMonad = ReaderT Env (ExceptT String IO)
     
