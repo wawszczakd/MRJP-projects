@@ -38,20 +38,30 @@ module LLVMInstructions where
     instance Show LLVMArg where
         show (LLVMArg typ reg) = show typ ++ " " ++ show reg
     
-    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMReg
+    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMType LLVMReg
     instance Show LLVMVal where
-        show (IntVal n)   = "i32 " ++ show n
-        show (BoolVal b)  = "i1 " ++ if b then "1" else "0"
-        show (StrVal s)   = "i8* " ++ show s
-        show (RegVal reg) = show reg
+        show (IntVal n)       = show n
+        show (BoolVal b)      = if b then "1" else "0"
+        show (StrVal s)       = show s
+        show (RegVal typ reg) = show reg
+    
+    data LLVMValT = LLVMValT LLVMVal
+    instance Show LLVMValT where
+        show (LLVMValT (IntVal n))       = "i32 " ++ show n
+        show (LLVMValT (BoolVal b))      = "i1 " ++ if b then "1" else "0"
+        show (LLVMValT (StrVal s))       = "i8* " ++ show s
+        show (LLVMValT (RegVal typ reg)) = show typ ++ " " ++ show reg
+    
+    toLLVMValT :: LLVMVal -> LLVMValT
+    toLLVMValT val = LLVMValT val
     
     data LLVMInstr =
         LLVMEmpty
         | LLVMFunDec LLVMType String [LLVMArgDec]
         | LLVMFunDef LLVMType String [LLVMArg] [LLVMInstr]
-        | LLVMRet LLVMVal
+        | LLVMRet LLVMValT
         | LLVMRetVoid
-        | LLVMCall LLVMType String [LLVMVal]
+        | LLVMCall LLVMType String [LLVMValT]
         | LLVMAss LLVMReg LLVMInstr
         | LLVMBin LLVMReg LLVMBinOp LLVMType LLVMVal LLVMVal
     instance Show LLVMInstr where

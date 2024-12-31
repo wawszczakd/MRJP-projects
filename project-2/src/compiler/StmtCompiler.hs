@@ -61,7 +61,7 @@ module StmtCompiler where
     
     compileStmt (Ret _ expr) = do
         (val, instrs) <- compileExpr expr
-        return $ instrs ++ [LLVMRet val]
+        return $ instrs ++ [LLVMRet (toLLVMValT val)]
     
     compileStmt (VRet _) =
         return [LLVMRetVoid]

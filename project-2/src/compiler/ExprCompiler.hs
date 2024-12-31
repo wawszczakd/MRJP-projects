@@ -40,34 +40,34 @@ module ExprCompiler where
         else
             put (nextLoc, nextReg, (funEnv, varEnv), store)
         
-        return (if retType == LLVMVoid then RegVal (LLVMReg (-1)) else RegVal (LLVMReg nextReg), instrs ++ [instr])
+        return (if retType == LLVMVoid then RegVal LLVMVoid (LLVMReg (-1)) else RegVal retType (LLVMReg nextReg), instrs ++ [instr])
         where
-            compileArgs :: [Expr] -> CompilerMonad ([LLVMVal], [LLVMInstr])
+            compileArgs :: [Expr] -> CompilerMonad ([LLVMValT], [LLVMInstr])
             compileArgs [] = return ([], [])
             compileArgs (arg : rest) = do
                 (argVal, argCode) <- compileExpr arg
                 (restVals, restCodes) <- compileArgs rest
-                return (argVal : restVals, argCode ++ restCodes)
+                return ((toLLVMValT argVal) : restVals, argCode ++ restCodes)
     
     compileExpr (Neg _ expr) = do
         (exprVal, instrs) <- compileExpr expr
         case exprVal of
             IntVal val -> return (IntVal (-val), instrs)
-            RegVal (LLVMReg reg) -> do
+            RegVal _ (LLVMReg reg) -> do
                 (nextLoc, nextReg, env, store) <- get
-                let instr = LLVMBin (LLVMReg nextReg) LLVMMinus LLVMInt (IntVal 0) (RegVal (LLVMReg reg))
+                let instr = LLVMBin (LLVMReg nextReg) LLVMMinus LLVMInt (IntVal 0) (RegVal LLVMInt (LLVMReg reg))
                 put (nextLoc, nextReg + 1, env, store)
-                return (RegVal (LLVMReg nextReg), instrs ++ [instr])
+                return (RegVal LLVMInt (LLVMReg nextReg), instrs ++ [instr])
     
     compileExpr (Not _ expr) = do
         (exprVal, instrs) <- compileExpr expr
         case exprVal of
             BoolVal val -> return (BoolVal (not val), instrs)
-            RegVal (LLVMReg reg) -> do
+            RegVal LLVMBool (LLVMReg reg) -> do
                 (nextLoc, nextReg, env, store) <- get
-                let notInstr = LLVMBin (LLVMReg nextReg) LLVMXor LLVMBool (BoolVal True) (RegVal (LLVMReg reg))
+                let notInstr = LLVMBin (LLVMReg nextReg) LLVMXor LLVMBool (BoolVal True) (RegVal LLVMBool (LLVMReg reg))
                 put (nextLoc, nextReg + 1, env, store)
-                return (RegVal (LLVMReg nextReg), instrs ++ [notInstr])
+                return (RegVal LLVMBool (LLVMReg nextReg), instrs ++ [notInstr])
     
     compileExpr (EMul _ expr1 op expr2) = do
         (exprVal1, instrs1) <- compileExpr expr1
@@ -82,7 +82,7 @@ module ExprCompiler where
                 (nextLoc, nextReg, env, store) <- get
                 let instr = LLVMBin (LLVMReg nextReg) (opToLLVM op) LLVMInt lhs rhs
                 put (nextLoc, nextReg + 1, env, store)
-                return (RegVal (LLVMReg nextReg), instrs1 ++ instrs2 ++ [instr])
+                return (RegVal LLVMInt (LLVMReg nextReg), instrs1 ++ instrs2 ++ [instr])
         where
             opToLLVM :: MulOp -> LLVMBinOp
             opToLLVM (Times _) = LLVMTimes
@@ -101,7 +101,7 @@ module ExprCompiler where
                 (nextLoc, nextReg, env, store) <- get
                 let instr = LLVMBin (LLVMReg nextReg) (opToLLVM op) LLVMInt lhs rhs
                 put (nextLoc, nextReg + 1, env, store)
-                return (RegVal (LLVMReg nextReg), instrs1 ++ instrs2 ++ [instr])
+                return (RegVal LLVMInt (LLVMReg nextReg), instrs1 ++ instrs2 ++ [instr])
         where
             opToLLVM :: AddOp -> LLVMBinOp
             opToLLVM (Plus _)  = LLVMPlus

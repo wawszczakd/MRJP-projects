@@ -57,11 +57,11 @@ module Compiler where
         return $ [funDef]
         where
             insertArg :: Arg -> CompilerMonad ()
-            insertArg (Ar _ _ name) = do
+            insertArg (Ar _ typ name) = do
                 (nextLoc, nextReg, (funEnv, varEnv), store) <- get
                 let
                     newVarEnv = Data.Map.insert name nextLoc varEnv
-                    newStore = Data.Map.insert nextLoc (RegVal (LLVMReg nextReg)) store
+                    newStore = Data.Map.insert nextLoc (RegVal (typeToLLVM typ) (LLVMReg nextReg)) store
                 put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
             
             formatArg :: Integer -> Integer -> Arg -> LLVMArg
@@ -70,8 +70,8 @@ module Compiler where
             
             addReturn :: Type -> LLVMInstr
             addReturn (Void _) = LLVMRetVoid
-            addReturn (Int _) = LLVMRet (IntVal 0)
-            addReturn (Bool _) = LLVMRet (BoolVal False)
+            addReturn (Int _) = LLVMRet (toLLVMValT (IntVal 0))
+            addReturn (Bool _) = LLVMRet (toLLVMValT (BoolVal False))
     
     compileBlock :: Block -> CompilerMonad [LLVMInstr]
     compileBlock (Blck _ stmts) = do
