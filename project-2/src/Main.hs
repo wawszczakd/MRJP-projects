@@ -2,7 +2,9 @@ module Main where
     import Compiler
     import Control.Monad.Except
     import Control.Monad.Reader
+    import Data.List
     import Data.Map
+    import LLVMInstructions
     import ParLatte
     import System.Directory
     import System.Environment
@@ -29,7 +31,8 @@ module Main where
                                 putStrLn "Type checking successful."
                                 
                                 let
-                                    code = compileProgram program
+                                    instrs = compileProgram program
+                                    code = unlines (Data.List.map show instrs)
                                     llFile = replaceExtension file "ll"
                                     bcFile = replaceExtension file "bc"
                                 writeFile llFile code

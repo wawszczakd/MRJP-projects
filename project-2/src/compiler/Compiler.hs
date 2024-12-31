@@ -3,27 +3,28 @@ module Compiler where
     import Control.Monad.State
     import Data.List
     import Data.Map
+    import LLVMInstructions
     import StmtCompiler
     import UtilsCompiler
     
-    compileProgram :: Program -> String
+    compileProgram :: Program -> [LLVMInstr]
     compileProgram (Prog _ topDefs) =
         let
             (_, envWithFuncs) = runState (insertFuncs topDefs) (1, 1, (Data.Map.empty, Data.Map.empty), Data.Map.empty)
             (programBody, _) = runState (compileTopDefs topDefs) envWithFuncs
-            programHead = [ "declare i32 @readInt()"
-                          , "declare i8* @readString()"
-                          , "declare void @printInt(i32)"
-                          , "declare void @printString(i8*)" ]
+            programHead = [ LLVMFunDec LLVMInt "readInt" []
+                          , LLVMFunDec LLVMStr "readString" []
+                          , LLVMFunDec LLVMVoid "printInt" [LLVMArg LLVMInt (LLVMReg 1)]
+                          , LLVMFunDec LLVMVoid "printString" [LLVMArg LLVMStr (LLVMReg 1)] ]
         in
-            unlines (programHead ++ programBody)
+            programHead ++ programBody
     
     insertFuncs :: [TopDef] -> CompilerMonad ()
     insertFuncs topDefs = do
-        let builtInFuncs = [ ("readInt", "i32")
-                           , ("readString", "i8*")
-                           , ("printInt", "void")
-                           , ("printString", "void") ]
+        let builtInFuncs = [ ("readInt", LLVMInt)
+                           , ("readString", LLVMStr)
+                           , ("printInt", LLVMVoid)
+                           , ("printString", LLVMVoid) ]
         modify (\(nextLoc, nextReg, (funEnv, varEnv), store) ->
             (nextLoc, nextReg, (Data.List.foldr (\(name, entry) -> Data.Map.insert (Ident name) entry) funEnv builtInFuncs, varEnv), store))
         foldM_ (\_ topDef -> do
@@ -35,26 +36,26 @@ module Compiler where
                     _ -> return ()
                 return ()) () topDefs
     
-    compileTopDefs :: [TopDef] -> CompilerMonad [String]
+    compileTopDefs :: [TopDef] -> CompilerMonad [LLVMInstr]
     compileTopDefs topDefs = do
         foldM (\acc topDef -> do
                     topDefCode <- compileTopDef topDef
-                    return $ acc ++ [""] ++ topDefCode) [] topDefs
+                    return $ acc ++ [LLVMEmpty] ++ topDefCode) [] topDefs
     
-    compileTopDef :: TopDef -> CompilerMonad [String]
+    compileTopDef :: TopDef -> CompilerMonad [LLVMInstr]
     compileTopDef (TopFunDef _ (FnDef _ typ (Ident name) args block)) = do
         (nextLoc, nextReg, env, store) <- get
         
         mapM_ insertArg args
+        -- funBody <- compileBlock block
         let
+            funcBody = []
             retType = typeToLLVM typ
-            llvmArgs = intercalate ", " $ zipWith (formatArg nextReg) [0..] args
-            funcHeader = "define " ++ retType ++ " @" ++ name ++ "(" ++ llvmArgs ++ ") {"
-            funcFooter = "}"
-        funcBody <- compileBlock block
+            llvmArgs = zipWith (formatArg nextReg) [0..] args
+            funDef = LLVMFunDef retType name llvmArgs (funcBody ++ [addReturn typ])
         
         put (nextLoc, nextReg, env, store)
-        return $ [funcHeader] ++ funcBody ++ (addReturn typ) ++ [funcFooter]
+        return $ [funDef]
         where
             insertArg :: Arg -> CompilerMonad ()
             insertArg (Ar _ _ name) = do
@@ -64,15 +65,13 @@ module Compiler where
                     newStore = Data.Map.insert nextLoc (Re nextReg) store
                 put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore)
             
-            formatArg :: Integer -> Integer -> Arg -> String
+            formatArg :: Integer -> Integer -> Arg -> LLVMArg
             formatArg curNextReg index (Ar _ typ (Ident name)) =
-                typeToLLVM typ ++ " %" ++ show (curNextReg + index)
+                LLVMArg (typeToLLVM typ) (LLVMReg (curNextReg + index))
             
-            addReturn :: Type -> [String]
-            addReturn (Void _) = ["    ret void"]
-            addReturn (Int _)  = ["    ret i32 0"]
-            addReturn (Bool _) = ["    ret i1 0"]
-            addReturn (Str _)  = ["    ret i8* null"]
+            addReturn :: Type -> LLVMInstr
+            addReturn (Void _) = LLVMRetVoid
+            addReturn typ = LLVMRet (typeToLLVM typ) (NumVal 0)
     
     compileBlock :: Block -> CompilerMonad [String]
     compileBlock (Blck _ stmts) = do
