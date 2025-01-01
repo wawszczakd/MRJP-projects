@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 module ExprCompiler where
     import AbsLatte
     import Control.Monad.State
@@ -47,7 +45,7 @@ module ExprCompiler where
             compileArgs (arg : rest) = do
                 (argVal, argCode) <- compileExpr arg
                 (restVals, restCodes) <- compileArgs rest
-                return ((toLLVMValT argVal) : restVals, argCode ++ restCodes)
+                return (toLLVMValT argVal : restVals, argCode ++ restCodes)
     
     compileExpr (Neg _ expr) = do
         (exprVal, instrs) <- compileExpr expr

@@ -25,11 +25,11 @@ module LLVMInstructions where
         show LLVMAnd   = "and"
         show LLVMOr    = "or"
     
-    data LLVMReg = LLVMReg Integer
+    newtype LLVMReg = LLVMReg Integer
     instance Show LLVMReg where
         show (LLVMReg reg) = "%R" ++ show reg
     
-    data LLVMArgDec = LLVMArgDec LLVMType
+    newtype LLVMArgDec = LLVMArgDec LLVMType
     instance Show LLVMArgDec where
         show (LLVMArgDec typ) = show typ
     
@@ -44,7 +44,7 @@ module LLVMInstructions where
         show (StrVal s)       = show s
         show (RegVal typ reg) = show reg
     
-    data LLVMValT = LLVMValT LLVMVal
+    newtype LLVMValT = LLVMValT LLVMVal
     instance Show LLVMValT where
         show (LLVMValT (IntVal n))       = "i32 " ++ show n
         show (LLVMValT (BoolVal b))      = "i1 " ++ if b then "1" else "0"
@@ -52,7 +52,7 @@ module LLVMInstructions where
         show (LLVMValT (RegVal typ reg)) = show typ ++ " " ++ show reg
     
     toLLVMValT :: LLVMVal -> LLVMValT
-    toLLVMValT val = LLVMValT val
+    toLLVMValT = LLVMValT
     
     data LLVMInstr =
         LLVMEmpty

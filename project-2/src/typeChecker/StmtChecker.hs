@@ -42,7 +42,7 @@ module StmtChecker where
                     if exprType /= toMyType typ then
                         throwError ("Type mismatch in initialization of " ++ name ++ ", " ++ showPosition pos)
                     else
-                        return $ (funEnv, Data.Map.insert (Ident name) (toMyType typ, depth) varEnv))
+                        return (funEnv, Data.Map.insert (Ident name) (toMyType typ, depth) varEnv))
             
             checkAlreadyDeclared :: Integer -> Env -> Ident -> BNFC'Position -> TypeCheckerMonad ()
             checkAlreadyDeclared depth (funEnv, varEnv) (Ident name) pos =

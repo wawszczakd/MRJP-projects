@@ -24,8 +24,7 @@ module StmtCompiler where
         return instrs
     
     compileStmt (Decl _ typ vars) = do
-        instrs <- concat <$> mapM (insertVar typ) vars
-        return instrs
+        concat <$> mapM (insertVar typ) vars
         where
             insertVar :: Type -> Item -> CompilerMonad [LLVMInstr]
             insertVar typ (NoInit _ name) = do
@@ -43,7 +42,7 @@ module StmtCompiler where
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = Data.Map.insert nextLoc val store
                 put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore)
-                return (instrs)
+                return instrs
     
     compileStmt (Ass _ (LVar _ name) expr) = do
         (val, instrs) <- compileExpr expr

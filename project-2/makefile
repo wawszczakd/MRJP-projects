@@ -1,10 +1,16 @@
-all: runtime
+all: latc_llvm
+
+latc_llvm: runtime
 	cabal build
 	cp dist-newstyle/build/*/*/latte-0.1.0.0/x/latc_llvm/build/latc_llvm/latc_llvm latc_llvm
 
-runtime:
-	clang -S -emit-llvm -o lib/runtime.ll lib/runtime.c
+runtime: lib/runtime.bc
+
+lib/runtime.bc: lib/runtime.ll
 	llvm-as -o lib/runtime.bc lib/runtime.ll
+
+lib/runtime.ll: lib/runtime.c
+	clang -S -emit-llvm -o lib/runtime.ll lib/runtime.c
 
 clean:
 	cabal clean
