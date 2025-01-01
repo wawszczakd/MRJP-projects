@@ -53,11 +53,33 @@ module StmtCompiler where
         put (nextLoc, nextReg, (funEnv, varEnv), newStore)
         return instrs
     
-    compileStmt (Incr _ (LVar _ (Ident name))) =
-        return [LLVMEmpty] -- TODO
+    compileStmt (Incr _ (LVar _ name)) = do
+        (nextLoc, nextReg, (funEnv, varEnv), store) <- get
+        let Just loc = Data.Map.lookup name varEnv
+            Just val = Data.Map.lookup loc store
+        case val of
+            (IntVal n) -> do
+                let newStore = Data.Map.insert loc (IntVal (n + 1)) store
+                put (nextLoc, nextReg, (funEnv, varEnv), newStore)
+                return []
+            (RegVal typ reg) -> do
+                let newStore = Data.Map.insert loc (RegVal LLVMInt (LLVMReg nextReg)) store
+                put (nextLoc, nextReg + 1, (funEnv, varEnv), newStore)
+                return [LLVMBin (LLVMReg nextReg) LLVMPlus LLVMInt (RegVal LLVMInt reg) (IntVal 1)]
     
-    compileStmt (Decr _ (LVar _ (Ident name))) =
-        return [LLVMEmpty] -- TODO
+    compileStmt (Decr _ (LVar _ name)) = do
+        (nextLoc, nextReg, (funEnv, varEnv), store) <- get
+        let Just loc = Data.Map.lookup name varEnv
+            Just val = Data.Map.lookup loc store
+        case val of
+            (IntVal n) -> do
+                let newStore = Data.Map.insert loc (IntVal (n - 1)) store
+                put (nextLoc, nextReg, (funEnv, varEnv), newStore)
+                return []
+            (RegVal typ reg) -> do
+                let newStore = Data.Map.insert loc (RegVal LLVMInt (LLVMReg nextReg)) store
+                put (nextLoc, nextReg + 1, (funEnv, varEnv), newStore)
+                return [LLVMBin (LLVMReg nextReg) LLVMMinus LLVMInt (RegVal LLVMInt reg) (IntVal 1)]
     
     compileStmt (Ret _ expr) = do
         (val, instrs) <- compileExpr expr

@@ -124,13 +124,11 @@ module ExprCompiler where
                 let result = case op of
                                 EQU _ -> val1 == val2
                                 NE _  -> val1 /= val2
-                                _     -> error "Invalid operation for Bool values"
                 in return (BoolVal result, instrs1 ++ instrs2)
             (StrVal val1, StrVal val2) ->
                 let result = case op of
                                 EQU _ -> val1 == val2
                                 NE _  -> val1 /= val2
-                                _     -> error "Invalid operation for String values"
                 in return (BoolVal result, instrs1 ++ instrs2)
             (lhs, rhs) -> do
                 (nextLoc, nextReg, env, store) <- get
