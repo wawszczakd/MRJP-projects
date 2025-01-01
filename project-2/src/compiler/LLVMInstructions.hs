@@ -8,7 +8,7 @@ module LLVMInstructions where
         show LLVMBool = "i1"
         show LLVMVoid = "void"
     
-    data LLVMBinOp = LLVMPlus | LLVMMinus | LLVMTimes | LLVMDiv | LLVMMod | LLVMXor
+    data LLVMBinOp = LLVMPlus | LLVMMinus | LLVMTimes | LLVMDiv | LLVMMod | LLVMXor | LLVMLTH | LLVMLE | LLVMGTH | LLVMGE | LLVMEQU | LLVMNE | LLVMAnd | LLVMOr
     instance Show LLVMBinOp where
         show LLVMPlus  = "add"
         show LLVMMinus = "sub"
@@ -16,15 +16,14 @@ module LLVMInstructions where
         show LLVMDiv   = "sdiv"
         show LLVMMod   = "srem"
         show LLVMXor   = "xor"
-    
-    data LLVMRelOp = LLVMLTH | LLVMLE | LLVMGTH | LLVMGE | LLVMEQU | LLVMNE
-    instance Show LLVMRelOp where
-        show LLVMLTH = "slt"
-        show LLVMLE  = "sle"
-        show LLVMGTH = "sgt"
-        show LLVMGE  = "sge"
-        show LLVMEQU = "eq"
-        show LLVMNE  = "ne"
+        show LLVMLTH   = "slt"
+        show LLVMLE    = "sle"
+        show LLVMGTH   = "sgt"
+        show LLVMGE    = "sge"
+        show LLVMEQU   = "icmp eq"
+        show LLVMNE    = "icmp ne"
+        show LLVMAnd   = "and"
+        show LLVMOr    = "or"
     
     data LLVMReg = LLVMReg Integer
     instance Show LLVMReg where
