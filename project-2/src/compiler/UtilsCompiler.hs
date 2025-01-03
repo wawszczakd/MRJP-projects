@@ -10,8 +10,8 @@ module UtilsCompiler where
     -- maps locations to registers --
     type Store = Data.Map.Map Integer LLVMVal
     
-    -- (next available location, next available register, env, store, last used label, next available label) --
-    type CompilerMonad = State (Integer, Integer, Env, Store, LLVMLab, Integer)
+    -- (next available location, next available register, next available label, env, store) --
+    type CompilerMonad = State (Integer, Integer, Integer, Env, Store)
     
     typeToLLVM :: Type -> LLVMType
     typeToLLVM (Int _) = LLVMInt

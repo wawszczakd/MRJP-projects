@@ -10,7 +10,7 @@ module Compiler where
     compileProgram :: Program -> [LLVMInstr]
     compileProgram (Prog _ topDefs) =
         let
-            (_, envWithFuncs) = runState (insertFuncs topDefs) (0, 0, (Data.Map.empty, Data.Map.empty), Data.Map.empty, LLVMLab 0, 1)
+            (_, envWithFuncs) = runState (insertFuncs topDefs) (0, 0, 1, (Data.Map.empty, Data.Map.empty), Data.Map.empty)
             (programBody, _) = runState (compileTopDefs topDefs) envWithFuncs
             programHead = [ LLVMFunDec LLVMVoid "printInt" [LLVMArgDec LLVMInt]
                           , LLVMFunDec LLVMVoid "printString" [LLVMArgDec LLVMStr]
@@ -27,14 +27,14 @@ module Compiler where
                            , ("error", LLVMVoid)
                            , ("readInt", LLVMInt)
                            , ("readString", LLVMStr) ]
-        modify (\(nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) ->
-            (nextLoc, nextReg, (Data.List.foldr (\(name, entry) -> Data.Map.insert (Ident name) entry) funEnv builtInFuncs, varEnv), store, lastLabel, nextLabel))
+        modify (\(nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) ->
+            (nextLoc, nextReg, nextLabel, (Data.List.foldr (\(name, entry) -> Data.Map.insert (Ident name) entry) funEnv builtInFuncs, varEnv), store))
         foldM_ (\_ topDef -> do
                 case topDef of
                     TopFunDef _ (FnDef _ typ name _ _) -> do
                         let retType = typeToLLVM typ
-                        modify (\(nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) ->
-                            (nextLoc, nextReg, (Data.Map.insert name retType funEnv, varEnv), store, lastLabel, nextLabel))
+                        modify (\(nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) ->
+                            (nextLoc, nextReg, nextLabel, (Data.Map.insert name retType funEnv, varEnv), store))
                     _ -> return ()
                 return ()) () topDefs
     
@@ -46,12 +46,12 @@ module Compiler where
     
     compileTopDef :: TopDef -> CompilerMonad [LLVMInstr]
     compileTopDef (TopFunDef _ (FnDef _ typ (Ident name) args (Blck _ stmts))) = do
-        (nextLoc, nextReg, env, store, lastLabel, nextLabel) <- get
+        (nextLoc, nextReg, nextLabel, env, store) <- get
         
         mapM_ insertArg args
         instrs <- compileStmts stmts
         let
-            funBody = LLVMLabel lastLabel : instrs
+            funBody = LLVMLabel (LLVMLab 0) : instrs
             retType = typeToLLVM typ
             llvmArgs = zipWith (formatArg nextReg) [0..] args
             lastInstr = if Data.List.null funBody then Nothing else Just (last funBody)
@@ -60,16 +60,16 @@ module Compiler where
                         Just LLVMRetVoid -> LLVMFunDef retType name llvmArgs funBody
                         _ -> LLVMFunDef retType name llvmArgs (funBody ++ [addReturn typ])
         
-        put (nextLoc, nextReg, env, store, lastLabel, nextLabel)
+        put (nextLoc, nextReg, nextLabel, env, store)
         return [funDef]
         where
             insertArg :: Arg -> CompilerMonad ()
             insertArg (Ar _ typ name) = do
-                (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+                (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
                 let
                     newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = Data.Map.insert nextLoc (RegVal (typeToLLVM typ) (LLVMReg nextReg)) store
-                put (nextLoc + 1, nextReg + 1, (funEnv, newVarEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc + 1, nextReg + 1, nextLabel, (funEnv, newVarEnv), newStore)
             
             formatArg :: Integer -> Integer -> Arg -> LLVMArg
             formatArg curNextReg index (Ar _ typ (Ident name)) =

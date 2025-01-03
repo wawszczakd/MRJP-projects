@@ -25,10 +25,10 @@ module StmtCompiler where
         return []
     
     compileStmt (BStmt _ (Blck _ stmts)) = do
-        (_, _, env, _, _, _) <- get
+        (_, _, _, env, _) <- get
         instrs <- compileStmts stmts
-        (nextLoc, nextReg, _, store, lastLabel, nextLabel) <- get
-        put (nextLoc, nextReg, env, store, lastLabel, nextLabel)
+        (nextLoc, nextReg, nextLabel, _, store) <- get
+        put (nextLoc, nextReg, nextLabel, env, store)
         return instrs
     
     compileStmt (Decl _ typ vars) = do
@@ -36,56 +36,56 @@ module StmtCompiler where
         where
             insertVar :: Type -> Item -> CompilerMonad [LLVMInstr]
             insertVar typ (NoInit _ name) = do
-                (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+                (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = case typ of
                         (Int _)  -> Data.Map.insert nextLoc (IntVal 0) store
                         (Bool _) -> Data.Map.insert nextLoc (BoolVal False) store
                         (Str _)  -> Data.Map.insert nextLoc (StrVal "") store
-                put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc + 1, nextReg, nextLabel, (funEnv, newVarEnv), newStore)
                 return []
             insertVar typ (Init _ name expr) = do
                 (val, instrs) <- compileExpr expr
-                (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+                (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
                 let newVarEnv = Data.Map.insert name nextLoc varEnv
                     newStore = Data.Map.insert nextLoc val store
-                put (nextLoc + 1, nextReg, (funEnv, newVarEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc + 1, nextReg, nextLabel, (funEnv, newVarEnv), newStore)
                 return instrs
     
     compileStmt (Ass _ (LVar _ name) expr) = do
         (val, instrs) <- compileExpr expr
-        (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+        (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
         let Just loc = Data.Map.lookup name varEnv
             newStore = Data.Map.insert loc val store
-        put (nextLoc, nextReg, (funEnv, varEnv), newStore, lastLabel, nextLabel)
+        put (nextLoc, nextReg, nextLabel, (funEnv, varEnv), newStore)
         return instrs
     
     compileStmt (Incr _ (LVar _ name)) = do
-        (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+        (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
         let Just loc = Data.Map.lookup name varEnv
             Just val = Data.Map.lookup loc store
         case val of
             (IntVal n) -> do
                 let newStore = Data.Map.insert loc (IntVal (n + 1)) store
-                put (nextLoc, nextReg, (funEnv, varEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc, nextReg, nextLabel, (funEnv, varEnv), newStore)
                 return []
             (RegVal typ reg) -> do
                 let newStore = Data.Map.insert loc (RegVal LLVMInt (LLVMReg nextReg)) store
-                put (nextLoc, nextReg + 1, (funEnv, varEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc, nextReg + 1, nextLabel, (funEnv, varEnv), newStore)
                 return [LLVMBin (LLVMReg nextReg) LLVMPlus LLVMInt (RegVal LLVMInt reg) (IntVal 1)]
     
     compileStmt (Decr _ (LVar _ name)) = do
-        (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+        (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
         let Just loc = Data.Map.lookup name varEnv
             Just val = Data.Map.lookup loc store
         case val of
             (IntVal n) -> do
                 let newStore = Data.Map.insert loc (IntVal (n - 1)) store
-                put (nextLoc, nextReg, (funEnv, varEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc, nextReg, nextLabel, (funEnv, varEnv), newStore)
                 return []
             (RegVal typ reg) -> do
                 let newStore = Data.Map.insert loc (RegVal LLVMInt (LLVMReg nextReg)) store
-                put (nextLoc, nextReg + 1, (funEnv, varEnv), newStore, lastLabel, nextLabel)
+                put (nextLoc, nextReg + 1, nextLabel, (funEnv, varEnv), newStore)
                 return [LLVMBin (LLVMReg nextReg) LLVMMinus LLVMInt (RegVal LLVMInt reg) (IntVal 1)]
     
     compileStmt (Ret _ expr) = do
@@ -108,16 +108,16 @@ module StmtCompiler where
                 instrs2 <- compileStmt stmt2
                 return $ instrs ++ instrs2
             (RegVal _ (LLVMReg reg)) -> do
-                (nextLoc, nextReg, (funEnv, varEnv), store, lastLabel, nextLabel) <- get
+                (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
                 
-                put (nextLoc, nextReg, (funEnv, varEnv), store, LLVMLab nextLabel, nextLabel + 1)
+                put (nextLoc, nextReg, nextLabel + 1, (funEnv, varEnv), store)
                 instrs1 <- compileStmt stmt1
                 
-                (nextLoc1, nextReg1, _, store1, lastLabel1, nextLabel1) <- get
-                put (nextLoc1, nextReg1, (funEnv, varEnv), store, LLVMLab nextLabel1, nextLabel1 + 1)
+                (nextLoc1, nextReg1, nextLabel1, _, store1) <- get
+                put (nextLoc1, nextReg1, nextLabel1 + 1, (funEnv, varEnv), store)
                 instrs2 <- compileStmt stmt2
                 
-                (nextLoc2, nextReg2, _, store2, lastLabel2, nextLabel2) <- get
+                (nextLoc2, nextReg2, nextLabel2, _, store2) <- get
                 
                 let instrs1Label = LLVMLabel (LLVMLab nextLabel) : instrs1 ++ [LLVMBr (LLVMLab nextLabel2)]
                     instrs2Label = LLVMLabel (LLVMLab nextLabel1) : instrs2 ++ [LLVMBr (LLVMLab nextLabel2)]
@@ -130,15 +130,15 @@ module StmtCompiler where
                                           , let Just val2 = Data.Map.lookup loc store2
                                           , val /= val1 || val /= val2 ]
                 let phiInstrs = [ LLVMPhi (LLVMReg (nextReg2 + fromIntegral i)) LLVMInt
-                                  [(fromJust (Data.Map.lookup loc store1), lastLabel1)
-                                  ,(fromJust (Data.Map.lookup loc store2), lastLabel2)]
+                                  [(fromJust (Data.Map.lookup loc store1), LLVMLab (nextLabel1 - 1))
+                                  ,(fromJust (Data.Map.lookup loc store2), LLVMLab (nextLabel2 - 1))]
                                 | (i, loc) <- zip [0..] differingVars ]
                     newStore = Data.List.foldl (\acc (i, loc) -> Data.Map.insert loc (RegVal LLVMInt (LLVMReg (nextReg2 + fromIntegral i))) acc)
                                                 store
                                                 (zip [0..] differingVars)
                 
                 let nextReg2' = nextReg2 + fromIntegral (length phiInstrs)
-                put (nextLoc2, nextReg2', (funEnv, varEnv), newStore, LLVMLab nextLabel2, nextLabel2 + 1)
+                put (nextLoc2, nextReg2', nextLabel2 + 1, (funEnv, varEnv), newStore)
                 
                 return $ instrs ++ [brInstr] ++ instrs1Label ++ instrs2Label ++ [endLabel] ++ phiInstrs
     
