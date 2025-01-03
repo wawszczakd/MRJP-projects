@@ -25,7 +25,7 @@ module LLVMInstructions where
         show LLVMAnd   = "and"
         show LLVMOr    = "or"
     
-    newtype LLVMReg = LLVMReg Integer
+    newtype LLVMReg = LLVMReg Integer deriving Eq
     instance Show LLVMReg where
         show (LLVMReg reg) = "%R" ++ show reg
     
@@ -37,7 +37,7 @@ module LLVMInstructions where
     instance Show LLVMArg where
         show (LLVMArg typ reg) = show typ ++ " " ++ show reg
     
-    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMType LLVMReg
+    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMType LLVMReg deriving Eq
     instance Show LLVMVal where
         show (IntVal n)       = show n
         show (BoolVal b)      = if b then "1" else "0"
@@ -54,6 +54,10 @@ module LLVMInstructions where
     toLLVMValT :: LLVMVal -> LLVMValT
     toLLVMValT = LLVMValT
     
+    newtype LLVMLab = LLVMLab Integer
+    instance Show LLVMLab where
+        show (LLVMLab l) = "L" ++ show l
+    
     data LLVMInstr =
         LLVMEmpty
         | LLVMFunDec LLVMType String [LLVMArgDec]
@@ -63,6 +67,10 @@ module LLVMInstructions where
         | LLVMCallVoid String [LLVMValT]
         | LLVMCall LLVMReg LLVMType String [LLVMValT]
         | LLVMBin LLVMReg LLVMBinOp LLVMType LLVMVal LLVMVal
+        | LLVMLabel LLVMLab
+        | LLVMBr LLVMLab
+        | LLVMBrCond LLVMVal LLVMLab LLVMLab
+        | LLVMPhi LLVMReg LLVMType [(LLVMVal, LLVMLab)]
     instance Show LLVMInstr where
         show LLVMEmpty = ""
         show (LLVMFunDec typ name args) =
@@ -80,3 +88,11 @@ module LLVMInstructions where
             "    " ++ show reg ++ " = " ++ "call " ++ show typ ++ " @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ")"
         show (LLVMBin reg op typ val1 val2) =
             "    " ++ show reg ++ " = " ++ show op ++ " " ++ show typ ++ " " ++ show val1 ++ ", " ++ show val2
+        show (LLVMLabel lab) =
+            show lab ++ ":"
+        show (LLVMBr lab) =
+            "    br label %" ++ show lab
+        show (LLVMBrCond val lab1 lab2) =
+            "    br i1 " ++ show val ++ ", label %" ++ show lab1 ++ ", label %" ++ show lab2
+        show (LLVMPhi reg typ vals) =
+            "    " ++ show reg ++ " = phi " ++ show typ ++ " " ++ intercalate ", " [ "[" ++ show val ++ ", %" ++ show lab ++ "]" | (val, lab) <- vals ]
