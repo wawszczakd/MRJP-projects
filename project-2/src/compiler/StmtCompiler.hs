@@ -95,8 +95,42 @@ module StmtCompiler where
     compileStmt (VRet _) =
         return [LLVMRetVoid]
     
-    compileStmt (Cond _ expr stmt) =
-        return [LLVMEmpty] -- TODO
+    compileStmt (Cond _ expr stmt) = do
+        (val, instrs) <- compileExpr expr
+        case val of
+            (BoolVal True) -> do
+                instrs1 <- compileStmt stmt
+                return $ instrs ++ instrs1
+            (BoolVal False) ->
+                return instrs
+            (RegVal _ (LLVMReg reg)) -> do
+                (nextLoc, nextReg, nextLabel, (funEnv, varEnv), store) <- get
+                
+                put (nextLoc, nextReg, nextLabel + 1, (funEnv, varEnv), store)
+                instrs1 <- compileStmt stmt
+                
+                (nextLoc1, nextReg1, nextLabel1, _, store1) <- get
+                
+                let instrs1Label = LLVMLabel (LLVMLab nextLabel) : instrs1 ++ [LLVMBr (LLVMLab nextLabel1)]
+                    brInstr      = LLVMBrCond (RegVal LLVMBool (LLVMReg reg)) (LLVMLab nextLabel) (LLVMLab nextLabel1)
+                    endLabel     = LLVMLabel (LLVMLab nextLabel1)
+                
+                let differingVars = [ loc | (var, loc) <- Data.Map.toList varEnv
+                                          , let Just val = Data.Map.lookup loc store
+                                          , let Just val1 = Data.Map.lookup loc store1
+                                          , val /= val1 ]
+                let phiInstrs = [ LLVMPhi (LLVMReg (nextReg1 + fromIntegral i)) LLVMInt
+                                  [(fromJust (Data.Map.lookup loc store), LLVMLab (nextLabel - 1))
+                                  ,(fromJust (Data.Map.lookup loc store1), LLVMLab (nextLabel1 - 1))]
+                                | (i, loc) <- zip [0..] differingVars ]
+                    newStore = Data.List.foldl (\acc (i, loc) -> Data.Map.insert loc (RegVal LLVMInt (LLVMReg (nextReg1 + fromIntegral i))) acc)
+                                                store
+                                                (zip [0..] differingVars)
+                
+                let nextReg1' = nextReg1 + fromIntegral (length phiInstrs)
+                put (nextLoc1, nextReg1', nextLabel1 + 1, (funEnv, varEnv), newStore)
+                
+                return $ instrs ++ [brInstr] ++ instrs1Label ++ [endLabel] ++ phiInstrs
     
     compileStmt (CondElse _ expr stmt1 stmt2) = do
         (val, instrs) <- compileExpr expr
