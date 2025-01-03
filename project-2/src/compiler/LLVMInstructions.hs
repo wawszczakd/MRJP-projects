@@ -60,8 +60,8 @@ module LLVMInstructions where
         | LLVMFunDef LLVMType String [LLVMArg] [LLVMInstr]
         | LLVMRet LLVMValT
         | LLVMRetVoid
-        | LLVMCall LLVMType String [LLVMValT]
-        | LLVMAss LLVMReg LLVMInstr
+        | LLVMCallVoid String [LLVMValT]
+        | LLVMCall LLVMReg LLVMType String [LLVMValT]
         | LLVMBin LLVMReg LLVMBinOp LLVMType LLVMVal LLVMVal
     instance Show LLVMInstr where
         show LLVMEmpty = ""
@@ -71,12 +71,12 @@ module LLVMInstructions where
             "define " ++ show typ ++ " @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ") {\n" ++
             unlines (map show body) ++ "}"
         show (LLVMRet val) =
-            "ret " ++ show val
+            "    ret " ++ show val
         show LLVMRetVoid =
-            "ret void"
-        show (LLVMCall typ name args) =
-            "call " ++ show typ ++ " @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ")"
-        show (LLVMAss reg instr) =
-            show reg ++ " = " ++ show instr
+            "    ret void"
+        show (LLVMCallVoid name args) =
+            "    call void @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ")"
+        show (LLVMCall reg typ name args) =
+            "    " ++ show reg ++ " = " ++ "call " ++ show typ ++ " @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ")"
         show (LLVMBin reg op typ val1 val2) =
-            show reg ++ " = " ++ show op ++ " " ++ show typ ++ " " ++ show val1 ++ ", " ++ show val2
+            "    " ++ show reg ++ " = " ++ show op ++ " " ++ show typ ++ " " ++ show val1 ++ ", " ++ show val2

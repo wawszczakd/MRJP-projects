@@ -7,9 +7,15 @@ module StmtCompiler where
     import UtilsCompiler
     
     compileStmts :: [Stmt] -> CompilerMonad [LLVMInstr]
-    compileStmts stmts = do
-        stmtResults <- mapM compileStmt stmts
-        return $ concat stmtResults
+    compileStmts [] = return []
+    compileStmts (stmt:stmts) = do
+        instrs <- compileStmt stmt
+        case stmt of
+            Ret _ _ -> return instrs
+            VRet _  -> return instrs
+            _       -> do
+                restInstrs <- compileStmts stmts
+                return $ instrs ++ restInstrs
     
     compileStmt :: Stmt -> CompilerMonad [LLVMInstr]
     

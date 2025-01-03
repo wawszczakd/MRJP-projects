@@ -11,10 +11,11 @@ module TypeChecker where
     checkProgram :: Program -> TypeCheckerMonad ()
     checkProgram (Prog _ topDefs) = do
         let funEnv = Data.Map.fromList [
-                (Ident "readInt", MyFun MyInt []),
-                (Ident "readString", MyFun MyStr []),
                 (Ident "printInt", MyFun MyVoid [MyInt]),
-                (Ident "printString", MyFun MyVoid [MyStr])]
+                (Ident "printString", MyFun MyVoid [MyStr]),
+                (Ident "error", MyFun MyVoid []),
+                (Ident "readInt", MyFun MyInt []),
+                (Ident "readString", MyFun MyStr [])]
         newEnv <- local (const (funEnv, Data.Map.empty)) (getFunEnv topDefs)
         local (const newEnv) (checkTopDefs topDefs)
     

@@ -30,8 +30,8 @@ module ExprCompiler where
         (nextLoc, nextReg, _, store) <- get
         let
             instr
-                | retType == LLVMVoid = LLVMCall retType name argVals
-                | otherwise = LLVMAss (LLVMReg nextReg) (LLVMCall retType name argVals)
+                | retType == LLVMVoid = LLVMCallVoid name argVals
+                | otherwise = LLVMCall (LLVMReg nextReg) retType name argVals
         
         if retType /= LLVMVoid then
             put (nextLoc, nextReg + 1, (funEnv, varEnv), store)
@@ -128,6 +128,21 @@ module ExprCompiler where
                                 EQU _ -> val1 == val2
                                 NE _  -> val1 /= val2
                 in return (BoolVal result, instrs1 ++ instrs2)
+            (RegVal typ1 (LLVMReg reg1), RegVal typ2 (LLVMReg reg2)) ->
+                if reg1 == reg2 then
+                    let result = case op of
+                                    LTH _ -> False
+                                    LE _  -> True
+                                    GTH _ -> False
+                                    GE _  -> True
+                                    EQU _ -> True
+                                    NE _  -> False
+                    in return (BoolVal result, instrs1 ++ instrs2)
+                else do
+                    (nextLoc, nextReg, env, store) <- get
+                    let instr = LLVMBin (LLVMReg nextReg) (opToLLVM op) typ1 (RegVal typ1 (LLVMReg reg1)) (RegVal typ2 (LLVMReg reg2))
+                    put (nextLoc, nextReg + 1, env, store)
+                    return (RegVal LLVMBool (LLVMReg nextReg), instrs1 ++ instrs2 ++ [instr])
             (lhs, rhs) -> do
                 (nextLoc, nextReg, env, store) <- get
                 let instr = LLVMBin (LLVMReg nextReg) (opToLLVM op) (getLLVMType lhs) lhs rhs
