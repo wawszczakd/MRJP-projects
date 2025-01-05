@@ -121,12 +121,6 @@ module StmtCompiler where
                     trueLabel = LLVMLab (nextLabel state1 - 1)
                     falseLabel = LLVMLab (nextLabel state - 1)
                     
-                    fixStringVal :: LLVMVal -> CompilerMonad (LLVMVal, [LLVMInstr])
-                    fixStringVal (StrVal s) = do
-                        (reg, instrs) <- getStrReg s
-                        return (RegVal LLVMStr reg, instrs)
-                    fixStringVal val = return (val, [])
-                    
                     getPhiInstr :: CompilerState -> CompilerState -> Integer -> CompilerMonad ([LLVMInstr], [LLVMInstr], [LLVMInstr])
                     getPhiInstr trueState falseState loc = do
                         curState <- get
@@ -185,12 +179,6 @@ module StmtCompiler where
                     trueLabel = LLVMLab (nextLabel state1 - 1)
                     falseLabel = LLVMLab (nextLabel state2 - 1)
                     
-                    fixStringVal :: LLVMVal -> CompilerMonad (LLVMVal, [LLVMInstr])
-                    fixStringVal (StrVal s) = do
-                        (reg, instrs) <- getStrReg s
-                        return (RegVal LLVMStr reg, instrs)
-                    fixStringVal val = return (val, [])
-                    
                     getPhiInstr :: CompilerState -> CompilerState -> Integer -> CompilerMonad ([LLVMInstr], [LLVMInstr], [LLVMInstr])
                     getPhiInstr trueState falseState loc = do
                         curState <- get
@@ -220,8 +208,87 @@ module StmtCompiler where
                 
                 return $ instrs ++ [brInstr] ++ instrs1Label ++ instrs2Label ++ [endLabel] ++ concat phiInstrs
     
-    compileStmt (While _ expr stmt) =
-        return [LLVMEmpty] -- TODO
+    compileStmt (While _ expr stmt) = do
+        initState <- get
+        
+        -- liftIO $ print $ "env before: " ++ show (varEnv initState)
+        -- liftIO $ print $ "store before: " ++ show (store initState)
+        
+        let (updatedStore, newNextReg) = Data.Map.foldrWithKey modifyStoreEntry (store initState, nextReg initState) (store initState)
+        put initState { store = updatedStore, nextReg = newNextReg }
+        
+        regStateBeforeStmt <- get
+        -- liftIO $ print $ "store changed to regs: " ++ show (store regStateBeforeStmt)
+        _ <- compileStmt stmt
+        regStateAfterStmt <- get
+        -- liftIO $ print $ "store after stmts: " ++ show (store regStateAfterStmt)
+        
+        let differingVars = [ loc | (var, loc) <- Data.Map.toList (varEnv initState)
+                                , let Just val1 = Data.Map.lookup loc (store regStateBeforeStmt)
+                                , let Just val2 = Data.Map.lookup loc (store regStateAfterStmt)
+                                , val1 /= val2 ]
+        
+        -- liftIO $ print $ "env after: " ++ show (varEnv regStateAfterStmt)
+        -- liftIO $ print $ "differingVars: " ++ show differingVars
+        
+        put initState
+        
+        (phiInstrs, loadInstrs) <- foldM generatePhiInstrs ([], []) differingVars
+        state <- get
+        
+        let beginInstrs = [LLVMBr (LLVMLab (nextLabel state)),
+                           LLVMLabel (LLVMLab (nextLabel state))]
+        put state { nextLabel = nextLabel state + 2 }
+        
+        (exprVal, exprInstrs) <- compileExpr expr
+        
+        stmtInstrs <- compileStmt stmt
+        
+        stateAfterStmt <- get
+        let exitLabel = LLVMLab (nextLabel stateAfterStmt)
+            brInstrs = [LLVMBrCond exprVal (LLVMLab (nextLabel state + 1)) exitLabel,
+                        LLVMLabel (LLVMLab (nextLabel state + 1))]
+        
+        let phiInstrsFinal = updatePhiInstrs phiInstrs differingVars stateAfterStmt (LLVMLab (nextLabel stateAfterStmt - 1))
+        
+        put stateAfterStmt { nextLabel = nextLabel stateAfterStmt + 1, varEnv = varEnv state, funEnv = funEnv state, store = store state, strLoadReg = strLoadReg state }
+        
+        return $ loadInstrs ++ beginInstrs ++ phiInstrsFinal ++ exprInstrs ++
+                 brInstrs ++ stmtInstrs ++ [LLVMBr (LLVMLab (nextLabel state))] ++ [LLVMLabel exitLabel]
+        where
+            modifyStoreEntry :: Integer -> LLVMVal -> (Store, Integer) -> (Store, Integer)
+            modifyStoreEntry loc val (accStore, currentNextReg)
+                | isRegVal val = (accStore, currentNextReg)
+                | otherwise =
+                    let newRegVal = RegVal (getTypeFromVal val) (LLVMReg currentNextReg)
+                        newStore = Data.Map.insert loc newRegVal accStore
+                        newNextReg = currentNextReg + 1
+                    in (newStore, newNextReg)
+            
+            isRegVal :: LLVMVal -> Bool
+            isRegVal (RegVal _ _) = True
+            isRegVal _ = False
+            
+            generatePhiInstrs :: ([LLVMInstr], [LLVMInstr]) -> Integer -> CompilerMonad ([LLVMInstr], [LLVMInstr])
+            generatePhiInstrs (phiAcc, loadAcc) loc = do
+                state <- get
+                (val, loadInstrs) <- fixStringVal (fromJust (Data.Map.lookup loc (store state)))
+                let reg = nextReg state
+                    typ = getTypeFromVal val
+                    phiInstr = LLVMPhi (LLVMReg reg) typ [(val, LLVMLab (nextLabel state - 1))]
+                put state { nextReg = nextReg state + 1 , store = Data.Map.insert loc (RegVal typ (LLVMReg reg)) (store state) }
+                return (phiAcc ++ [phiInstr], loadAcc ++ loadInstrs)
+            
+            updatePhiInstrs :: [LLVMInstr] -> [Integer] -> CompilerState -> LLVMLab -> [LLVMInstr]
+            updatePhiInstrs phiInstrs differingVars state lab =
+                [ updatePhiInstr phi loc | (phi, loc) <- zip phiInstrs differingVars ]
+                where
+                    updatePhiInstr :: LLVMInstr -> Integer -> LLVMInstr
+                    updatePhiInstr (LLVMPhi reg typ list) loc =
+                        let val = fromJust (Data.Map.lookup loc (store state))
+                            updatedList = list ++ [(val, lab)]
+                        in LLVMPhi reg typ updatedList
+                    updatePhiInstr instr _ = instr
     
     compileStmt (SExp _ expr) = do
         (_, instrs) <- compileExpr expr

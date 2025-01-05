@@ -57,5 +57,12 @@ module UtilsCompiler where
     
     getTypeFromVal :: LLVMVal -> LLVMType
     getTypeFromVal (IntVal _) = LLVMInt
+    getTypeFromVal (StrVal _) = LLVMStr
     getTypeFromVal (BoolVal _) = LLVMBool
     getTypeFromVal (RegVal typ _) = typ
+    
+    fixStringVal :: LLVMVal -> CompilerMonad (LLVMVal, [LLVMInstr])
+    fixStringVal (StrVal s) = do
+        (reg, instrs) <- getStrReg s
+        return (RegVal LLVMStr reg, instrs)
+    fixStringVal val = return (val, [])
