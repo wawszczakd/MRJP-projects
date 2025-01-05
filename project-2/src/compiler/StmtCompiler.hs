@@ -1,5 +1,6 @@
 module StmtCompiler where
     import AbsLatte
+    import Control.Monad.Identity
     import Control.Monad.State
     import Data.List
     import Data.Map
@@ -110,27 +111,49 @@ module StmtCompiler where
                 instrs1 <- compileStmt stmt
                 
                 state1 <- get
-                
-                let instrs1Label = LLVMLabel (LLVMLab (nextLabel state)) : instrs1 ++ [LLVMBr (LLVMLab (nextLabel state1))]
-                    brInstr      = LLVMBrCond (RegVal LLVMBool (LLVMReg reg)) (LLVMLab (nextLabel state)) (LLVMLab (nextLabel state1))
-                    endLabel     = LLVMLabel (LLVMLab (nextLabel state1))
+                put state1 { nextLabel = nextLabel state1 + 1, funEnv = funEnv state, varEnv = varEnv state, store = store state, strLoadReg = strLoadReg state }
                 
                 let differingVars = [ loc | (var, loc) <- Data.Map.toList (varEnv state)
                                           , let Just val = Data.Map.lookup loc (store state)
                                           , let Just val1 = Data.Map.lookup loc (store state1)
                                           , val /= val1 ]
-                let phiInstrs = [ LLVMPhi (LLVMReg (nextReg state1 + fromIntegral i)) LLVMInt
-                                  [(fromJust (Data.Map.lookup loc (store state)), LLVMLab (nextLabel state - 1))
-                                  ,(fromJust (Data.Map.lookup loc (store state1)), LLVMLab (nextLabel state1 - 1))]
-                                | (i, loc) <- zip [0..] differingVars ]
-                    newStore = Data.List.foldl (\acc (i, loc) -> Data.Map.insert loc (RegVal LLVMInt (LLVMReg (nextReg state1 + fromIntegral i))) acc)
-                                                (store state)
-                                                (zip [0..] differingVars)
+                    
+                    trueLabel = LLVMLab (nextLabel state1 - 1)
+                    falseLabel = LLVMLab (nextLabel state - 1)
+                    
+                    fixStringVal :: LLVMVal -> CompilerMonad (LLVMVal, [LLVMInstr])
+                    fixStringVal (StrVal s) = do
+                        (reg, instrs) <- getStrReg s
+                        return (RegVal LLVMStr reg, instrs)
+                    fixStringVal val = return (val, [])
+                    
+                    getPhiInstr :: CompilerState -> CompilerState -> Integer -> CompilerMonad ([LLVMInstr], [LLVMInstr], [LLVMInstr])
+                    getPhiInstr trueState falseState loc = do
+                        curState <- get
+                        put curState { strLoadReg = strLoadReg trueState }
+                        (val1, loadInstrs1) <- fixStringVal (fromJust (Data.Map.lookup loc (store trueState)))
+                        
+                        curState' <- get
+                        put curState' { strLoadReg = strLoadReg falseState }
+                        (val2, loadInstrs2) <- fixStringVal (fromJust (Data.Map.lookup loc (store falseState)))
+                        
+                        state <- get
+                        let typ = getTypeFromVal val1
+                            reg = nextReg state
+                            phiInstr = LLVMPhi (LLVMReg reg) typ [(val1, trueLabel), (val2, falseLabel)]
+                        
+                        put state { nextReg = reg + 1, store = Data.Map.insert loc (RegVal typ (LLVMReg reg)) (store state), strLoadReg = strLoadReg curState }
+                        
+                        return (loadInstrs1, loadInstrs2, [phiInstr])
                 
-                let nextReg1' = nextReg state1 + fromIntegral (length phiInstrs)
-                put state1 { nextReg = nextReg1', nextLabel = nextLabel state1 + 1, funEnv = funEnv state, varEnv = varEnv state, store = newStore }
+                tmp <- mapM (getPhiInstr state1 state) differingVars
+                let (loadInstrs1, loadInstrs2, phiInstrs) = unzip3 tmp
                 
-                return $ instrs ++ [brInstr] ++ instrs1Label ++ [endLabel] ++ phiInstrs
+                let instrs1Label = LLVMLabel (LLVMLab (nextLabel state)) : instrs1 ++ concat loadInstrs1 ++ [LLVMBr (LLVMLab (nextLabel state1))]
+                    brInstr      = LLVMBrCond (RegVal LLVMBool (LLVMReg reg)) (LLVMLab (nextLabel state)) (LLVMLab (nextLabel state1))
+                    endLabel     = LLVMLabel (LLVMLab (nextLabel state1))
+                
+                return $ concat loadInstrs2 ++ instrs ++ [brInstr] ++ instrs1Label ++ [endLabel] ++ concat phiInstrs
     
     compileStmt (CondElse _ expr stmt1 stmt2) = do
         (val, instrs) <- compileExpr expr
@@ -143,37 +166,59 @@ module StmtCompiler where
                 return $ instrs ++ instrs2
             (RegVal _ (LLVMReg reg)) -> do
                 state <- get
-                put state {nextLabel = nextLabel state + 1}
+                put state { nextLabel = nextLabel state + 1 }
                 instrs1 <- compileStmt stmt1
                 
                 state1 <- get
-                put state1 {nextLabel = nextLabel state1 + 1, funEnv = funEnv state, varEnv = varEnv state, store = store state}
+                put state1 { nextLabel = nextLabel state1 + 1, funEnv = funEnv state, varEnv = varEnv state, store = store state, strLoadReg = strLoadReg state }
                 instrs2 <- compileStmt stmt2
                 
                 state2 <- get
-                
-                let instrs1Label = LLVMLabel (LLVMLab (nextLabel state)) : instrs1 ++ [LLVMBr (LLVMLab (nextLabel state2))]
-                    instrs2Label = LLVMLabel (LLVMLab (nextLabel state1)) : instrs2 ++ [LLVMBr (LLVMLab (nextLabel state2))]
-                    brInstr      = LLVMBrCond (RegVal LLVMBool (LLVMReg reg)) (LLVMLab (nextLabel state)) (LLVMLab (nextLabel state1))
-                    endLabel     = LLVMLabel (LLVMLab (nextLabel state2))
+                put state2 { funEnv = funEnv state, varEnv = varEnv state, store = store state, strLoadReg = strLoadReg state }
                 
                 let differingVars = [ loc | (var, loc) <- Data.Map.toList (varEnv state)
                                           , let Just val = Data.Map.lookup loc (store state)
                                           , let Just val1 = Data.Map.lookup loc (store state1)
                                           , let Just val2 = Data.Map.lookup loc (store state2)
                                           , val /= val1 || val /= val2 ]
-                let phiInstrs = [ LLVMPhi (LLVMReg (nextReg state2 + fromIntegral i)) LLVMInt
-                                  [(fromJust (Data.Map.lookup loc (store state1)), LLVMLab (nextLabel state1 - 1))
-                                  ,(fromJust (Data.Map.lookup loc (store state2)), LLVMLab (nextLabel state2 - 1))]
-                                | (i, loc) <- zip [0..] differingVars ]
-                    newStore = Data.List.foldl (\acc (i, loc) -> Data.Map.insert loc (RegVal LLVMInt (LLVMReg (nextReg state2 + fromIntegral i))) acc)
-                                                (store state)
-                                                (zip [0..] differingVars)
+                    
+                    trueLabel = LLVMLab (nextLabel state1 - 1)
+                    falseLabel = LLVMLab (nextLabel state2 - 1)
+                    
+                    fixStringVal :: LLVMVal -> CompilerMonad (LLVMVal, [LLVMInstr])
+                    fixStringVal (StrVal s) = do
+                        (reg, instrs) <- getStrReg s
+                        return (RegVal LLVMStr reg, instrs)
+                    fixStringVal val = return (val, [])
+                    
+                    getPhiInstr :: CompilerState -> CompilerState -> Integer -> CompilerMonad ([LLVMInstr], [LLVMInstr], [LLVMInstr])
+                    getPhiInstr trueState falseState loc = do
+                        curState <- get
+                        put curState { strLoadReg = strLoadReg trueState }
+                        (val1, loadInstrs1) <- fixStringVal (fromJust (Data.Map.lookup loc (store trueState)))
+                        
+                        curState' <- get
+                        put curState' { strLoadReg = strLoadReg falseState }
+                        (val2, loadInstrs2) <- fixStringVal (fromJust (Data.Map.lookup loc (store falseState)))
+                        
+                        state <- get
+                        let typ = getTypeFromVal val1
+                            reg = nextReg state
+                            phiInstr = LLVMPhi (LLVMReg reg) typ [(val1, trueLabel), (val2, falseLabel)]
+                        
+                        put state { nextReg = reg + 1, store = Data.Map.insert loc (RegVal typ (LLVMReg reg)) (store state), strLoadReg = strLoadReg curState }
+                        
+                        return (loadInstrs1, loadInstrs2, [phiInstr])
+                    
+                tmp <- mapM (getPhiInstr state1 state2) differingVars
+                let (loadInstrs1, loadInstrs2, phiInstrs) = unzip3 tmp
                 
-                let nextReg2' = nextReg state2 + fromIntegral (length phiInstrs)
-                put state2 { nextReg = nextReg2', nextLabel = nextLabel state2 + 1, funEnv = funEnv state, varEnv = varEnv state, store = newStore }
+                let instrs1Label = LLVMLabel (LLVMLab (nextLabel state)) : instrs1 ++ concat loadInstrs1 ++ [LLVMBr (LLVMLab (nextLabel state2))]
+                    instrs2Label = LLVMLabel (LLVMLab (nextLabel state1)) : instrs2 ++ concat loadInstrs2 ++ [LLVMBr (LLVMLab (nextLabel state2))]
+                    brInstr      = LLVMBrCond (RegVal LLVMBool (LLVMReg reg)) (LLVMLab (nextLabel state)) (LLVMLab (nextLabel state1))
+                    endLabel     = LLVMLabel (LLVMLab (nextLabel state2))
                 
-                return $ instrs ++ [brInstr] ++ instrs1Label ++ instrs2Label ++ [endLabel] ++ phiInstrs
+                return $ instrs ++ [brInstr] ++ instrs1Label ++ instrs2Label ++ [endLabel] ++ concat phiInstrs
     
     compileStmt (While _ expr stmt) =
         return [LLVMEmpty] -- TODO

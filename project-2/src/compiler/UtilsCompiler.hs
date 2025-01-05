@@ -14,18 +14,48 @@ module UtilsCompiler where
     type Store = Data.Map.Map Integer LLVMVal
     
     data CompilerState = CompilerState {
-        nextLoc   :: Integer, -- next available location
-        nextReg   :: Integer, -- next available register
-        nextLabel :: Integer, -- next available label
-        funEnv    :: FunEnv,
-        varEnv    :: VarEnv,
-        store     :: Store
+        nextLoc    :: Integer, -- next available location
+        nextReg    :: Integer, -- next available register
+        nextLabel  :: Integer, -- next available label
+        funEnv     :: FunEnv,
+        varEnv     :: VarEnv,
+        store      :: Store,
+        strDec     :: Data.Map.Map String Integer,
+        strLoadReg :: Data.Map.Map String LLVMReg,
+        nextStr    :: Integer
     }
     
-    type CompilerMonad = State CompilerState
+    type CompilerMonad = StateT CompilerState IO
     
     typeToLLVM :: Type -> LLVMType
     typeToLLVM (Int _) = LLVMInt
     typeToLLVM (Str _) = LLVMStr
     typeToLLVM (Bool _) = LLVMBool
     typeToLLVM (Void _) = LLVMVoid
+    
+    getStrReg :: String -> CompilerMonad (LLVMReg, [LLVMInstr])
+    getStrReg s = do
+        insertToStrDec s
+        state <- get
+        let Just n = Data.Map.lookup s (strDec state)
+        case Data.Map.lookup s (strLoadReg state) of
+            Just reg -> return (reg, [])
+            Nothing -> do
+                let reg = LLVMReg (nextReg state)
+                put state { nextReg = nextReg state + 1, strLoadReg = Data.Map.insert s reg (strLoadReg state) }
+                return (reg, [LLVMLoadStr reg (LLVMString s n)])
+        where
+            insertToStrDec :: String -> CompilerMonad ()
+            insertToStrDec s = do
+                state <- get
+                case Data.Map.lookup s (strDec state) of
+                    Just _ -> return ()
+                    Nothing -> do
+                        let newStrDec = Data.Map.insert s (nextStr state) (strDec state)
+                        put state { strDec = newStrDec, nextStr = nextStr state + 1 }
+                        return ()
+    
+    getTypeFromVal :: LLVMVal -> LLVMType
+    getTypeFromVal (IntVal _) = LLVMInt
+    getTypeFromVal (BoolVal _) = LLVMBool
+    getTypeFromVal (RegVal typ _) = typ

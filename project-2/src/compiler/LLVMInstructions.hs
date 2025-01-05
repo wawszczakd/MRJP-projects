@@ -41,14 +41,14 @@ module LLVMInstructions where
     instance Show LLVMVal where
         show (IntVal n)       = show n
         show (BoolVal b)      = if b then "1" else "0"
-        show (StrVal s)       = show s
+        show (StrVal s)       = "error, StrVal in LLVMVal, " ++ s
         show (RegVal typ reg) = show reg
     
     newtype LLVMValT = LLVMValT LLVMVal
     instance Show LLVMValT where
         show (LLVMValT (IntVal n))       = "i32 " ++ show n
         show (LLVMValT (BoolVal b))      = "i1 " ++ if b then "1" else "0"
-        show (LLVMValT (StrVal s))       = "i8* " ++ show s
+        show (LLVMValT (StrVal s))       = "error, StrVal in LLVMValT"
         show (LLVMValT (RegVal typ reg)) = show typ ++ " " ++ show reg
     
     toLLVMValT :: LLVMVal -> LLVMValT
@@ -58,10 +58,14 @@ module LLVMInstructions where
     instance Show LLVMLab where
         show (LLVMLab l) = "L" ++ show l
     
+    data LLVMString = LLVMString String Integer
+    
     data LLVMInstr =
         LLVMEmpty
         | LLVMFunDec LLVMType String [LLVMArgDec]
         | LLVMFunDef LLVMType String [LLVMArg] [LLVMInstr]
+        | LLVMStrDec LLVMString
+        | LLVMLoadStr LLVMReg LLVMString
         | LLVMRet LLVMValT
         | LLVMRetVoid
         | LLVMCallVoid String [LLVMValT]
@@ -78,6 +82,10 @@ module LLVMInstructions where
         show (LLVMFunDef typ name args body) =
             "define " ++ show typ ++ " @" ++ name ++ "(" ++ intercalate ", " (Data.List.map show args) ++ ") {\n" ++
             unlines (map show body) ++ "}"
+        show (LLVMStrDec (LLVMString s n)) =
+            "@S" ++ show n ++ " = private unnamed_addr constant [" ++ show (length s + 1) ++ " x i8] c\"" ++ s ++ "\\00\""
+        show (LLVMLoadStr reg (LLVMString s n)) =
+            "    " ++ show reg ++ " = getelementptr [" ++ show (length s + 1) ++ " x i8], [" ++ show (length s + 1) ++ " x i8]* @S" ++ show n ++ ", i64 0, i64 0"
         show (LLVMRet val) =
             "    ret " ++ show val
         show LLVMRetVoid =

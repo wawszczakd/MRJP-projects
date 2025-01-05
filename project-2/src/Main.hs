@@ -30,8 +30,8 @@ module Main where
                             Right () -> do
                                 putStrLn "Type checking successful."
                                 
+                                instrs <- compileProgram program
                                 let
-                                    instrs = compileProgram program
                                     code = unlines (Data.List.map show instrs)
                                     llFile = replaceExtension file "ll"
                                     bcFile = replaceExtension file "bc"

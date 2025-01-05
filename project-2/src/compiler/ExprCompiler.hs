@@ -47,6 +47,9 @@ module ExprCompiler where
                 (restVals, restCodes) <- compileArgs rest
                 return (toLLVMValT argVal : restVals, argCode ++ restCodes)
     
+    compileExpr (EString _ s) = do
+        return (StrVal s, [])
+    
     compileExpr (Neg _ expr) = do
         (exprVal, instrs) <- compileExpr expr
         case exprVal of
@@ -95,14 +98,25 @@ module ExprCompiler where
                 case op of
                     Plus _  -> return (IntVal (val1 + val2), instrs1 ++ instrs2)
                     Minus _ -> return (IntVal (val1 - val2), instrs1 ++ instrs2)
-            (StrVal val1, StrVal val2) ->
-                return (StrVal (val1 ++ val2), instrs1 ++ instrs2)
-            -- (StrVal val1, RegVal _ reg2) -> do
-            --     (nextLoc, nextReg, nextLabel, env, store) <- get
-            --     let getInstr  = LLVMLoadStr (LLVMReg nextReg) ...
-            --     let callInstr = LLVMCall (LLVMReg (nextReg + 1)) LLVMStr "__concatString" [toLLVMValT (StrVal val1), toLLVMValT (RegVal LLVMStr reg2)]
-            --     put (nextLoc, nextReg + 1, nextLabel, env, store)
-            --     return (RegVal LLVMStr (LLVMReg nextReg), instrs1 ++ instrs2 ++ [callInstr])
+            (StrVal s1, StrVal s2) ->
+                return (StrVal (s1 ++ s2), instrs1 ++ instrs2)
+            (StrVal s1, RegVal _ reg2) -> do
+                (reg1, regInstrs) <- getStrReg s1
+                state <- get
+                let callInstr = LLVMCall (LLVMReg (nextReg state)) LLVMStr "__concatString" [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMStr (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ regInstrs ++ [callInstr])
+            (RegVal _ reg1, StrVal s2) -> do
+                (reg2, regInstrs) <- getStrReg s2
+                state <- get
+                let callInstr = LLVMCall (LLVMReg (nextReg state)) LLVMStr "__concatString" [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMStr (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ regInstrs ++ [callInstr])
+            (RegVal LLVMStr reg1, RegVal LLVMStr reg2) -> do
+                state <- get
+                let callInstr = LLVMCall (LLVMReg (nextReg state)) LLVMStr "__concatString" [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMStr (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ [callInstr])
             (lhs, rhs) -> do
                 state <- get
                 let instr = LLVMBin (LLVMReg (nextReg state)) (opToLLVM op) LLVMInt lhs rhs
@@ -119,23 +133,52 @@ module ExprCompiler where
         case (exprVal1, exprVal2) of
             (IntVal val1, IntVal val2) ->
                 let result = case op of
-                                LTH _ -> val1 < val2
-                                LE _  -> val1 <= val2
-                                GTH _ -> val1 > val2
-                                GE _  -> val1 >= val2
-                                EQU _ -> val1 == val2
-                                NE _  -> val1 /= val2
+                        LTH _ -> val1 < val2
+                        LE _  -> val1 <= val2
+                        GTH _ -> val1 > val2
+                        GE _  -> val1 >= val2
+                        EQU _ -> val1 == val2
+                        NE _  -> val1 /= val2
                 in return (BoolVal result, instrs1 ++ instrs2)
             (BoolVal val1, BoolVal val2) ->
                 let result = case op of
-                                EQU _ -> val1 == val2
-                                NE _  -> val1 /= val2
+                        EQU _ -> val1 == val2
+                        NE _  -> val1 /= val2
                 in return (BoolVal result, instrs1 ++ instrs2)
             (StrVal val1, StrVal val2) ->
                 let result = case op of
-                                EQU _ -> val1 == val2
-                                NE _  -> val1 /= val2
+                        EQU _ -> val1 == val2
+                        NE _  -> val1 /= val2
                 in return (BoolVal result, instrs1 ++ instrs2)
+            (StrVal s1, RegVal _ reg2) -> do
+                (reg1, regInstrs) <- getStrReg s1
+                state <- get
+                let callInstr = case op of
+                        EQU _ -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__equString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                        NE _  -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__neqString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMBool (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ regInstrs ++ [callInstr])
+            (RegVal _ reg1, StrVal s2) -> do
+                (reg2, regInstrs) <- getStrReg s2
+                state <- get
+                let callInstr = case op of
+                        EQU _ -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__equString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                        NE _  -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__neqString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMBool (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ regInstrs ++ [callInstr])
+            (RegVal LLVMStr reg1, RegVal LLVMStr reg2) -> do
+                state <- get
+                let callInstr = case op of
+                        EQU _ -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__equString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                        NE _  -> LLVMCall (LLVMReg (nextReg state)) LLVMBool "__neqString"
+                                 [toLLVMValT (RegVal LLVMStr reg1), toLLVMValT (RegVal LLVMStr reg2)]
+                put state { nextReg = nextReg state + 1 }
+                return (RegVal LLVMBool (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ [callInstr])
             (RegVal typ1 (LLVMReg reg1), RegVal typ2 (LLVMReg reg2)) ->
                 if reg1 == reg2 then
                     let result = case op of
