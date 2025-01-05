@@ -41,14 +41,12 @@ module LLVMInstructions where
     instance Show LLVMVal where
         show (IntVal n)       = show n
         show (BoolVal b)      = if b then "1" else "0"
-        show (StrVal s)       = "error, StrVal in LLVMVal, " ++ s
         show (RegVal typ reg) = show reg
     
     newtype LLVMValT = LLVMValT LLVMVal
     instance Show LLVMValT where
         show (LLVMValT (IntVal n))       = "i32 " ++ show n
         show (LLVMValT (BoolVal b))      = "i1 " ++ if b then "1" else "0"
-        show (LLVMValT (StrVal s))       = "error, StrVal in LLVMValT"
         show (LLVMValT (RegVal typ reg)) = show typ ++ " " ++ show reg
     
     toLLVMValT :: LLVMVal -> LLVMValT

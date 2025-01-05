@@ -42,7 +42,8 @@ module UtilsCompiler where
             Just reg -> return (reg, [])
             Nothing -> do
                 let reg = LLVMReg (nextReg state)
-                put state { nextReg = nextReg state + 1, strLoadReg = Data.Map.insert s reg (strLoadReg state) }
+                    newStrLoadReg = Data.Map.insert s reg (strLoadReg state)
+                put state { nextReg = nextReg state + 1, strLoadReg = newStrLoadReg }
                 return (reg, [LLVMLoadStr reg (LLVMString s n)])
         where
             insertToStrDec :: String -> CompilerMonad ()

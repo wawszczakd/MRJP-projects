@@ -28,8 +28,7 @@ module ExprCompiler where
         let Just retType = Data.Map.lookup (Ident name) (funEnv state)
         (argVals, instrs) <- compileArgs args
         newState <- get
-        let
-            instr
+        let instr
                 | retType == LLVMVoid = LLVMCallVoid name argVals
                 | otherwise = LLVMCall (LLVMReg (nextReg newState)) retType name argVals
         
@@ -44,8 +43,9 @@ module ExprCompiler where
             compileArgs [] = return ([], [])
             compileArgs (arg : rest) = do
                 (argVal, argCode) <- compileExpr arg
+                (fixedArgVal, loadCode) <- fixStringVal argVal
                 (restVals, restCodes) <- compileArgs rest
-                return (toLLVMValT argVal : restVals, argCode ++ restCodes)
+                return (toLLVMValT fixedArgVal : restVals, argCode ++ loadCode ++ restCodes)
     
     compileExpr (EString _ s) = do
         return (StrVal s, [])

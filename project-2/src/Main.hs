@@ -10,6 +10,7 @@ module Main where
     import System.Environment
     import System.Exit
     import System.FilePath
+    import System.IO
     import System.Process
     import TypeChecker
     
@@ -22,28 +23,29 @@ module Main where
                 let parsingResult = pProgram $ myLexer input
                 case parsingResult of
                     (Left err) -> do
-                        putStrLn err
+                        hPutStrLn stderr "ERROR"
+                        hPutStrLn stderr err
                         exitFailure
                     (Right program) -> do
                         typeCheckingResult <- runExceptT $ runReaderT (checkProgram program) (Data.Map.empty, Data.Map.empty)
                         case typeCheckingResult of
                             Right () -> do
-                                putStrLn "Type checking successful."
-                                
                                 instrs <- compileProgram program
                                 let
                                     code = unlines (Data.List.map show instrs)
                                     llFile = replaceExtension file "ll"
                                     bcFile = replaceExtension file "bc"
                                 writeFile llFile code
-                                putStrLn $ "LLVM code has been written to " ++ llFile
                                 
                                 exeDir <- takeDirectory <$> getExecutablePath
                                 let runtimePath = exeDir </> "lib/runtime.bc"
                                 
                                 _ <- system $ "llvm-link " ++ llFile ++ " " ++ runtimePath ++ " -o " ++ bcFile
-                                putStrLn $ "Generated: " ++ bcFile
-                            Left err -> putStrLn $ "Type checking failed: " ++ err
+                                hPutStrLn stderr "OK"
+                            Left err -> do
+                                hPutStrLn stderr "ERROR"
+                                hPutStrLn stderr err
+                                exitFailure
             _ -> do
                 putStrLn "Invalid usage! Provide a file as an argument."
                 exitFailure
