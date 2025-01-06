@@ -52,4 +52,6 @@ for file in "$folder"/*.lat; do
     else
         echo -e "${RED}Wrong${NC}"
     fi
+    
+    rm -f output.log
 done

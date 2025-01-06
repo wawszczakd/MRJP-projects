@@ -16,3 +16,6 @@ clean:
 	cabal clean
 	rm -f latc_llvm
 	find . -type f \( -name "*.bc" -o -name "*.ll" \) -exec rm -f {} +
+
+dist: clean
+	tar -czvf dw440014.tar.gz *

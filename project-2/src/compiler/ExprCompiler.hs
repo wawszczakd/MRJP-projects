@@ -78,7 +78,7 @@ module ExprCompiler where
                 case op of
                     Times _ -> return (IntVal (val1 * val2), instrs1 ++ instrs2)
                     Div _   -> return (IntVal (val1 `div` val2), instrs1 ++ instrs2)
-                    Mod _   -> return (IntVal (val1 `mod` val2), instrs1 ++ instrs2)
+                    Mod _   -> return (IntVal (val1 `rem` val2), instrs1 ++ instrs2)
             (lhs, rhs) -> do
                 state <- get
                 let instr = LLVMBin (LLVMReg (nextReg state)) (opToLLVM op) LLVMInt lhs rhs
@@ -215,6 +215,7 @@ module ExprCompiler where
             getLLVMType (RegVal typ _) = typ
     
     compileExpr (EAnd _ expr1 expr2) = do
+        iniState <- get
         (exprVal1, instrs1) <- compileExpr expr1
         (exprVal2, instrs2) <- compileExpr expr2
         case (exprVal1, exprVal2) of
@@ -224,6 +225,23 @@ module ExprCompiler where
                 return (BoolVal False, instrs1)
             (_, BoolVal False) ->
                 return (BoolVal False, instrs2)
+            (RegVal _ _, RegVal _ _) -> do
+                put iniState
+                (reg1, instrs1) <- compileExpr expr1
+                state1 <- get
+                put state1 { nextLabel = nextLabel state1 + 1 }
+                (reg2, instrs2) <- compileExpr expr2
+                state2 <- get
+                let labTrue = LLVMLab (nextLabel state1)
+                    labFalse = LLVMLab (nextLabel state2)
+                    labFinal = LLVMLab (nextLabel state2 + 1)
+                    brInstr1 = LLVMBrCond reg1 labTrue labFalse
+                    brInstr2 = LLVMBrCond reg2 labFinal labFalse
+                    phiInstr = LLVMPhi (LLVMReg (nextReg state2)) LLVMBool [(BoolVal True, LLVMLab (nextLabel state2 - 1)), (BoolVal False, labFalse)]
+                    allInstrs = instrs1 ++ [brInstr1] ++ [LLVMLabel labTrue] ++ instrs2 ++ [brInstr2] ++ [LLVMLabel labFalse]
+                                ++ [LLVMBr labFinal] ++ [LLVMLabel labFinal] ++ [phiInstr]
+                put state2 { nextReg = nextReg state2 + 1, nextLabel = nextLabel state2 + 2 }
+                return (RegVal LLVMBool (LLVMReg (nextReg state2)), allInstrs)
             (lhs, rhs) -> do
                 state <- get
                 let instr = LLVMBin (LLVMReg (nextReg state)) LLVMAnd LLVMBool lhs rhs
@@ -231,6 +249,7 @@ module ExprCompiler where
                 return (RegVal LLVMBool (LLVMReg (nextReg state)), instrs1 ++ instrs2 ++ [instr])
     
     compileExpr (EOr _ expr1 expr2) = do
+        iniState <- get
         (exprVal1, instrs1) <- compileExpr expr1
         (exprVal2, instrs2) <- compileExpr expr2
         case (exprVal1, exprVal2) of
@@ -240,6 +259,23 @@ module ExprCompiler where
                 return (BoolVal True, instrs1)
             (_, BoolVal True) ->
                 return (BoolVal True, instrs2)
+            (RegVal _ _, RegVal _ _) -> do
+                put iniState
+                (reg1, instrs1) <- compileExpr expr1
+                state1 <- get
+                put state1 { nextLabel = nextLabel state1 + 1 }
+                (reg2, instrs2) <- compileExpr expr2
+                state2 <- get
+                let labFalse = LLVMLab (nextLabel state1)
+                    labTrue = LLVMLab (nextLabel state2)
+                    labFinal = LLVMLab (nextLabel state2 + 1)
+                    brInstr1 = LLVMBrCond reg1 labTrue labFalse
+                    brInstr2 = LLVMBrCond reg2 labTrue labFinal
+                    phiInstr = LLVMPhi (LLVMReg (nextReg state2)) LLVMBool [(BoolVal True, labTrue), (BoolVal False, LLVMLab (nextLabel state2 - 1))]
+                    allInstrs = instrs1 ++ [brInstr1] ++ [LLVMLabel labFalse] ++ instrs2 ++ [brInstr2] ++ [LLVMLabel labTrue]
+                                ++ [LLVMBr labFinal] ++ [LLVMLabel labFinal] ++ [phiInstr]
+                put state2 { nextReg = nextReg state2 + 1, nextLabel = nextLabel state2 + 2 }
+                return (RegVal LLVMBool (LLVMReg (nextReg state2)), allInstrs)
             (lhs, rhs) -> do
                 state <- get
                 let instr = LLVMBin (LLVMReg (nextReg state)) LLVMOr LLVMBool lhs rhs
