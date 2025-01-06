@@ -14,7 +14,7 @@ lib/runtime.ll: lib/runtime.c
 
 clean:
 	cabal clean
-	rm -f latc_llvm
+	rm -f dw440014.tar.gz latc_llvm
 	find . -type f \( -name "*.bc" -o -name "*.ll" \) -exec rm -f {} +
 
 dist: clean

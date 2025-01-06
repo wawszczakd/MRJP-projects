@@ -47,5 +47,5 @@ module Main where
                                 hPutStrLn stderr err
                                 exitFailure
             _ -> do
-                putStrLn "Invalid usage! Provide a file as an argument."
+                hPutStrLn stderr "Invalid usage! Provide a file as an argument."
                 exitFailure

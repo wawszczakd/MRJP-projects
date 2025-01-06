@@ -25,7 +25,7 @@ module StmtCompiler where
     compileStmt (Empty _) =
         return []
     
-    compileStmt (BStmt _ (Blck _ stmts)) = do
+    compileStmt (BStmt _ (Block _ stmts)) = do
         state <- get
         instrs <- compileStmts stmts
         newState <- get
@@ -53,7 +53,7 @@ module StmtCompiler where
                 put state { nextLoc = nextLoc state + 1, varEnv = newVarEnv, store = newStore }
                 return instrs
     
-    compileStmt (Ass _ (LVar _ name) expr) = do
+    compileStmt (Ass _ name expr) = do
         (val, instrs) <- compileExpr expr
         state <- get
         let Just loc = Data.Map.lookup name (varEnv state)
@@ -61,7 +61,7 @@ module StmtCompiler where
         put state { store = newStore }
         return instrs
     
-    compileStmt (Incr _ (LVar _ name)) = do
+    compileStmt (Incr _ name) = do
         state <- get
         let Just loc = Data.Map.lookup name (varEnv state)
             Just val = Data.Map.lookup loc (store state)
@@ -75,7 +75,7 @@ module StmtCompiler where
                 put state { nextReg = nextReg state + 1, store = newStore }
                 return [LLVMBin (LLVMReg (nextReg state)) LLVMPlus LLVMInt (RegVal LLVMInt reg) (IntVal 1)]
     
-    compileStmt (Decr _ (LVar _ name)) = do
+    compileStmt (Decr _ name) = do
         state <- get
         let Just loc = Data.Map.lookup name (varEnv state)
             Just val = Data.Map.lookup loc (store state)

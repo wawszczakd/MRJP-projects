@@ -21,7 +21,7 @@ module UtilsTypeChecker where
     toMyType (Void _) = MyVoid
     
     argToType :: Arg -> MyType
-    argToType (Ar _ typ _) = toMyType typ
+    argToType (Arg _ typ _) = toMyType typ
     
     showPosition :: Maybe (Int, Int) -> String
     showPosition Nothing = "position unknown"

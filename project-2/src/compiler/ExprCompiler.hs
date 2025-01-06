@@ -8,7 +8,7 @@ module ExprCompiler where
     
     compileExpr :: Expr -> CompilerMonad (LLVMVal, [LLVMInstr])
     
-    compileExpr (EVar _ (LVar _ name)) = do
+    compileExpr (EVar _ name) = do
         state <- get
         let Just loc = Data.Map.lookup name (varEnv state)
         let Just val = Data.Map.lookup loc (store state)
@@ -23,14 +23,15 @@ module ExprCompiler where
     compileExpr (ELitFalse _) =
         return (BoolVal False, [])
     
-    compileExpr (EApp _ (LVar _ (Ident name)) args) = do
+    compileExpr (EApp _ name args) = do
         state <- get
-        let Just retType = Data.Map.lookup (Ident name) (funEnv state)
+        let funName = getFunName name
+            Just retType = Data.Map.lookup (Ident funName) (funEnv state)
         (argVals, instrs) <- compileArgs args
         newState <- get
         let instr
-                | retType == LLVMVoid = LLVMCallVoid name argVals
-                | otherwise = LLVMCall (LLVMReg (nextReg newState)) retType name argVals
+                | retType == LLVMVoid = LLVMCallVoid funName argVals
+                | otherwise = LLVMCall (LLVMReg (nextReg newState)) retType funName argVals
         
         if retType /= LLVMVoid then
             put newState { nextReg = nextReg newState + 1, funEnv = funEnv state, varEnv = varEnv state }

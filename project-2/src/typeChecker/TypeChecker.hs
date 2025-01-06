@@ -9,7 +9,7 @@ module TypeChecker where
     import UtilsTypeChecker
     
     checkProgram :: Program -> TypeCheckerMonad ()
-    checkProgram (Prog _ topDefs) = do
+    checkProgram (Program _ topDefs) = do
         let funEnv = Data.Map.fromList [
                 (Ident "printInt", MyFun MyVoid [MyInt]),
                 (Ident "printString", MyFun MyVoid [MyStr]),
@@ -38,7 +38,7 @@ module TypeChecker where
         checkTopDefs topDefs
     
     insertTopDef :: TopDef -> TypeCheckerMonad Env
-    insertTopDef (TopFunDef _ (FnDef pos typ name args block)) = do
+    insertTopDef (FnDef pos typ name args block) = do
         (funEnv, varEnv) <- ask
         if not (checkArgsNames pos args) then
             throwError ("Function args names must be pairwise distinct, " ++ showPosition pos)
@@ -51,16 +51,16 @@ module TypeChecker where
         where
             checkArgsNames :: Maybe (Int, Int) -> [Arg] -> Bool
             checkArgsNames pos args =
-                let argsNames = Prelude.map (\(Ar _ _ name) -> name) args in
+                let argsNames = Prelude.map (\(Arg _ _ name) -> name) args in
                 Data.List.nub argsNames == argsNames
             
             checkArgsTypes :: Maybe (Int, Int) -> [Arg] -> Bool
             checkArgsTypes pos args =
-                let argsTypes = Prelude.map (\(Ar _ typ _) -> toMyType typ) args in
+                let argsTypes = Prelude.map (\(Arg _ typ _) -> toMyType typ) args in
                 notElem MyVoid argsTypes
     
     checkTopDef :: TopDef -> TypeCheckerMonad ()
-    checkTopDef (TopFunDef _ (FnDef pos typ name args block)) = do
+    checkTopDef (FnDef pos typ name args block) = do
         (funEnv, varEnv) <- ask
         (newFunEnv, newVarEnv) <- foldM insertArg (funEnv, varEnv) args
         ret <- local (const (newFunEnv, newVarEnv)) (checkBlock 1 (toMyType typ) block)
@@ -69,10 +69,10 @@ module TypeChecker where
                 throwError ("No return, " ++ showPosition pos)
         where
             insertArg :: Env -> Arg -> TypeCheckerMonad Env
-            insertArg (funEnv, varEnv) (Ar _ argType name) =
+            insertArg (funEnv, varEnv) (Arg _ argType name) =
                 return (funEnv, Data.Map.insert name (toMyType argType, 1) varEnv)
     
     checkBlock :: Integer -> MyType -> Block -> TypeCheckerMonad Bool
-    checkBlock depth retType (Blck _ stmts) = do
+    checkBlock depth retType (Block _ stmts) = do
         env <- ask
         local (const env) (checkStmts depth retType stmts)

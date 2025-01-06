@@ -22,7 +22,7 @@ module StmtChecker where
         env <- ask
         return (env, False)
     
-    checkStmt depth retType (BStmt _ (Blck _ stmts)) = do
+    checkStmt depth retType (BStmt _ (Block _ stmts)) = do
         env <- ask
         ret <- local (const env) (checkStmts (depth + 1) retType stmts)
         return (env, ret)
@@ -52,7 +52,7 @@ module StmtChecker where
                             throwError ("Variable " ++ name ++ " already declared, " ++ showPosition pos)
                     Nothing -> return ()
     
-    checkStmt _ _ (Ass _ (LVar pos (Ident name)) expr) = do
+    checkStmt _ _ (Ass pos (Ident name) expr) = do
         (funEnv, varEnv) <- ask
         case Data.Map.lookup (Ident name) varEnv of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
@@ -63,7 +63,7 @@ module StmtChecker where
                 else
                     return ((funEnv, varEnv), False)
     
-    checkStmt _ _ (Incr _ (LVar pos (Ident name))) = do
+    checkStmt _ _ (Incr pos (Ident name)) = do
         (funEnv, varEnv) <- ask
         case Data.Map.lookup (Ident name) varEnv of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)
@@ -73,7 +73,7 @@ module StmtChecker where
                 else
                     return ((funEnv, varEnv), False)
     
-    checkStmt _ _ (Decr _ (LVar pos (Ident name))) = do
+    checkStmt _ _ (Decr pos (Ident name)) = do
         (funEnv, varEnv) <- ask
         case Data.Map.lookup (Ident name) varEnv of
             Nothing -> throwError ("Variable " ++ name ++ " is not declared, " ++ showPosition pos)

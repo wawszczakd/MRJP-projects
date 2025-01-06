@@ -19,30 +19,19 @@ import qualified Prelude as C
 import qualified Data.String
 
 type Program = Program' BNFC'Position
-data Program' a = Prog a [TopDef' a]
+data Program' a = Program a [TopDef' a]
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type TopDef = TopDef' BNFC'Position
-data TopDef' a
-    = TopFunDef a (FunDef' a)
-    | ClDef a Ident [ClMem' a]
-    | ClExtDef a Ident Ident [ClMem' a]
-  deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-
-type FunDef = FunDef' BNFC'Position
-data FunDef' a = FnDef a (Type' a) Ident [Arg' a] (Block' a)
+data TopDef' a = FnDef a (Type' a) Ident [Arg' a] (Block' a)
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type Arg = Arg' BNFC'Position
-data Arg' a = Ar a (Type' a) Ident
-  deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-
-type ClMem = ClMem' BNFC'Position
-data ClMem' a = ClAtr a (Type' a) Ident | ClMeth a (FunDef' a)
+data Arg' a = Arg a (Type' a) Ident
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type Block = Block' BNFC'Position
-data Block' a = Blck a [Stmt' a]
+data Block' a = Block a [Stmt' a]
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type Stmt = Stmt' BNFC'Position
@@ -50,15 +39,14 @@ data Stmt' a
     = Empty a
     | BStmt a (Block' a)
     | Decl a (Type' a) [Item' a]
-    | Ass a (LVal' a) (Expr' a)
-    | Incr a (LVal' a)
-    | Decr a (LVal' a)
+    | Ass a Ident (Expr' a)
+    | Incr a Ident
+    | Decr a Ident
     | Ret a (Expr' a)
     | VRet a
     | Cond a (Expr' a) (Stmt' a)
     | CondElse a (Expr' a) (Stmt' a) (Stmt' a)
     | While a (Expr' a) (Stmt' a)
-    | ForEach a (Type' a) Ident (Expr' a) (Stmt' a)
     | SExp a (Expr' a)
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
@@ -66,29 +54,18 @@ type Item = Item' BNFC'Position
 data Item' a = NoInit a Ident | Init a Ident (Expr' a)
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
-type LVal = LVal' BNFC'Position
-data LVal' a
-    = LVar a Ident | LArr a Ident (Expr' a) | LMem a Ident Ident
-  deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-
 type Type = Type' BNFC'Position
 data Type' a
-    = Int a
-    | Str a
-    | Bool a
-    | Void a
-    | Obj a Ident
-    | Arr a (Type' a)
-    | Fun a (Type' a) [Type' a]
+    = Int a | Str a | Bool a | Void a | Fun a (Type' a) [Type' a]
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type Expr = Expr' BNFC'Position
 data Expr' a
-    = EVar a (LVal' a)
+    = EVar a Ident
     | ELitInt a Integer
     | ELitTrue a
     | ELitFalse a
-    | EApp a (LVal' a) [Expr' a]
+    | EApp a Ident [Expr' a]
     | EString a String
     | Neg a (Expr' a)
     | Not a (Expr' a)
@@ -97,9 +74,6 @@ data Expr' a
     | ERel a (Expr' a) (RelOp' a) (Expr' a)
     | EAnd a (Expr' a) (Expr' a)
     | EOr a (Expr' a) (Expr' a)
-    | ENewObj a Ident
-    | ENewArr a (Type' a) (Expr' a)
-    | ECastNull a (Type' a) Null
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type AddOp = AddOp' BNFC'Position
@@ -115,9 +89,6 @@ data RelOp' a = LTH a | LE a | GTH a | GE a | EQU a | NE a
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 newtype Ident = Ident String
-  deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
-
-newtype Null = Null String
   deriving (C.Eq, C.Ord, C.Show, C.Read, Data.String.IsString)
 
 -- | Start position (line, column) of something.
@@ -137,30 +108,19 @@ class HasPosition a where
 
 instance HasPosition Program where
   hasPosition = \case
-    Prog p _ -> p
+    Program p _ -> p
 
 instance HasPosition TopDef where
-  hasPosition = \case
-    TopFunDef p _ -> p
-    ClDef p _ _ -> p
-    ClExtDef p _ _ _ -> p
-
-instance HasPosition FunDef where
   hasPosition = \case
     FnDef p _ _ _ _ -> p
 
 instance HasPosition Arg where
   hasPosition = \case
-    Ar p _ _ -> p
-
-instance HasPosition ClMem where
-  hasPosition = \case
-    ClAtr p _ _ -> p
-    ClMeth p _ -> p
+    Arg p _ _ -> p
 
 instance HasPosition Block where
   hasPosition = \case
-    Blck p _ -> p
+    Block p _ -> p
 
 instance HasPosition Stmt where
   hasPosition = \case
@@ -175,7 +135,6 @@ instance HasPosition Stmt where
     Cond p _ _ -> p
     CondElse p _ _ _ -> p
     While p _ _ -> p
-    ForEach p _ _ _ _ -> p
     SExp p _ -> p
 
 instance HasPosition Item where
@@ -183,20 +142,12 @@ instance HasPosition Item where
     NoInit p _ -> p
     Init p _ _ -> p
 
-instance HasPosition LVal where
-  hasPosition = \case
-    LVar p _ -> p
-    LArr p _ _ -> p
-    LMem p _ _ -> p
-
 instance HasPosition Type where
   hasPosition = \case
     Int p -> p
     Str p -> p
     Bool p -> p
     Void p -> p
-    Obj p _ -> p
-    Arr p _ -> p
     Fun p _ _ -> p
 
 instance HasPosition Expr where
@@ -214,9 +165,6 @@ instance HasPosition Expr where
     ERel p _ _ _ -> p
     EAnd p _ _ -> p
     EOr p _ _ -> p
-    ENewObj p _ -> p
-    ENewArr p _ _ -> p
-    ECastNull p _ _ -> p
 
 instance HasPosition AddOp where
   hasPosition = \case

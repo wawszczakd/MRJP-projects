@@ -23,7 +23,7 @@ module ExprChecker where
     
     getExprType :: Expr -> TypeCheckerMonad (MyType, ValueState)
     
-    getExprType (EVar pos (LVar _ name)) = do
+    getExprType (EVar pos name) = do
         typ <- getVarType pos name
         return (typ, Unknown)
     
@@ -33,7 +33,7 @@ module ExprChecker where
     
     getExprType (ELitFalse _) = return (MyBool, FixedBool False)
     
-    getExprType (EApp pos (LVar _ (Ident name)) args) = do
+    getExprType (EApp pos (Ident name) args) = do
         (MyFun typ expectedArgs) <- getFunType pos (Ident name)
         argsTypes <- mapM (fmap fst . getExprType) args
         if expectedArgs /= argsTypes then

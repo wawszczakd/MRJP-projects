@@ -67,3 +67,9 @@ module UtilsCompiler where
         (reg, instrs) <- getStrReg s
         return (RegVal LLVMStr reg, instrs)
     fixStringVal val = return (val, [])
+    
+    getFunName :: Ident -> String
+    getFunName (Ident name) =
+        if name `elem` ["main", "printInt", "printString", "error", "readInt", "readString"]
+        then name
+        else "user_" ++ name
