@@ -10,27 +10,12 @@ purposes. The compiler (`latc_llvm`) currently supports:
 ## Optimizations
 
 The following optimizations have been implemented so far:
-- Uses SSA (not utilizing `alloca` instructions).
-- Calculates simple expressions and propagates constants.
-
-For instance, the following code:
-```c
-int main() {
-    int a = 2 + 2 * 2;
-    int b = a + 3;
-    int c = b + 1;
-    printInt(c);
-    return 0;
-}
-```
-will compile to:
-```llvm
-define i32 @main() {
-L0:
-    call void @printInt(i32 10)
-    ret i32 0
-}
-```
+- SSA Form: The compiler uses Static Single Assignment form, avoiding `alloca`.
+- Constant Propagation: Simple expressions are evaluated at compile time, and
+constants are propagated throughout the code.
+- Local Common Subexpression Elimination (LCSE): Redundant expressions within a
+single block are identified and eliminated, ensuring that each expression is
+computed only once and reused.
 
 ## Building and Running
 

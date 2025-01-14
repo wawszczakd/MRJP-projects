@@ -16,13 +16,6 @@ void error() {
     exit(1);
 }
 
-int readInt() {
-    int x;
-    scanf("%d", &x);
-    scanf("%*[ \t\n]");
-    return x;
-}
-
 char *readString() {
     size_t bufferSize = 1024, length = 0;
     char *buffer = malloc(bufferSize);
@@ -46,6 +39,13 @@ char *readString() {
     buffer[length] = '\0';
     
     return buffer;
+}
+
+int readInt() {
+    int x;
+    scanf("%d", &x);
+    readString();
+    return x;
 }
 
 bool __equString(char *s1, char *s2) {
