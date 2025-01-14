@@ -28,9 +28,11 @@ module Compiler where
                           , LLVMFunDec LLVMBool "__equString" [LLVMArgDec LLVMStr, LLVMArgDec LLVMStr]
                           , LLVMFunDec LLVMBool "__neString" [LLVMArgDec LLVMStr, LLVMArgDec LLVMStr]
                           , LLVMFunDec LLVMStr "__concatString" [LLVMArgDec LLVMStr, LLVMArgDec LLVMStr]
-                          , LLVMEmpty ]
+                          ]
             strDecs = [ LLVMStrDec (LLVMString s n) | (s, n) <- sortBy (\(_, n1) (_, n2) -> compare n1 n2) (Data.Map.toList (strDec finalState)) ]
-        return $ programHead ++ strDecs ++ programBody
+        case strDecs of
+            [] -> return $ programHead ++ programBody
+            _ ->  return $ programHead ++ [LLVMEmpty] ++ strDecs ++ programBody
     
     insertFuncs :: [TopDef] -> CompilerMonad ()
     insertFuncs topDefs = do
