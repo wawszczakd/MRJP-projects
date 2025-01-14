@@ -15,6 +15,7 @@ executable latc_llvm
         ExprCompiler,
         LexLatte,
         LLVMInstructions,
+        Optimizations,
         ParLatte,
         StmtChecker,
         StmtCompiler,

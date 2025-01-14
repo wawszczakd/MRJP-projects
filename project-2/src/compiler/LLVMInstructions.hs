@@ -1,14 +1,14 @@
 module LLVMInstructions where
     import Data.List
     
-    data LLVMType = LLVMInt | LLVMStr | LLVMBool | LLVMVoid deriving Eq
+    data LLVMType = LLVMInt | LLVMStr | LLVMBool | LLVMVoid deriving (Eq, Ord)
     instance Show LLVMType where
         show LLVMInt  = "i32"
         show LLVMStr  = "i8*"
         show LLVMBool = "i1"
         show LLVMVoid = "void"
     
-    data LLVMBinOp = LLVMPlus | LLVMMinus | LLVMTimes | LLVMDiv | LLVMMod | LLVMXor | LLVMLTH | LLVMLE | LLVMGTH | LLVMGE | LLVMEQU | LLVMNE | LLVMAnd | LLVMOr
+    data LLVMBinOp = LLVMPlus | LLVMMinus | LLVMTimes | LLVMDiv | LLVMMod | LLVMXor | LLVMLTH | LLVMLE | LLVMGTH | LLVMGE | LLVMEQU | LLVMNE | LLVMAnd | LLVMOr deriving (Eq, Ord)
     instance Show LLVMBinOp where
         show LLVMPlus  = "add"
         show LLVMMinus = "sub"
@@ -25,7 +25,7 @@ module LLVMInstructions where
         show LLVMAnd   = "and"
         show LLVMOr    = "or"
     
-    newtype LLVMReg = LLVMReg Integer deriving Eq
+    newtype LLVMReg = LLVMReg Integer deriving (Eq, Ord)
     instance Show LLVMReg where
         show (LLVMReg reg) = "%R" ++ show reg
     
@@ -37,7 +37,7 @@ module LLVMInstructions where
     instance Show LLVMArg where
         show (LLVMArg typ reg) = show typ ++ " " ++ show reg
     
-    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMType LLVMReg deriving Eq
+    data LLVMVal = IntVal Integer | StrVal String | BoolVal Bool | RegVal LLVMType LLVMReg deriving (Eq, Ord)
     instance Show LLVMVal where
         show (IntVal n)       = show n
         show (BoolVal b)      = if b then "1" else "0"

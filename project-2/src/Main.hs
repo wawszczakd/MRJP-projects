@@ -5,6 +5,7 @@ module Main where
     import Data.List
     import Data.Map
     import LLVMInstructions
+    import Optimizations
     import ParLatte
     import System.Directory
     import System.Environment
@@ -31,8 +32,8 @@ module Main where
                         case typeCheckingResult of
                             Right () -> do
                                 instrs <- compileProgram program
-                                let
-                                    code = unlines (Data.List.map show instrs)
+                                let instrsLCSE = doLCSE instrs
+                                    code = unlines (Data.List.map show instrsLCSE)
                                     llFile = replaceExtension file "ll"
                                     bcFile = replaceExtension file "bc"
                                 writeFile llFile code
