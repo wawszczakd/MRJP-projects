@@ -2,14 +2,14 @@
 
 This project is an implementation of the Latte compiler in Haskell. Latte is a
 simple imperative language inspired by Java and designed for educational
-purposes. The compiler (`latc_llvm`) currently supports:
+purposes. The compiler (`latc_llvm`) supports:
 
 - Type checking
 - Code generation in LLVM
 
 ## Optimizations
 
-The following optimizations have been implemented so far:
+The following optimizations have been implemented:
 - SSA Form: The compiler uses Static Single Assignment form, avoiding `alloca`.
 - Constant Propagation: Simple expressions are evaluated at compile time, and
 constants are propagated throughout the code.
@@ -30,9 +30,13 @@ To compile a `.lat` file, type:
 ```bash
 ./latc_llvm <file.lat>
 ```
-The compiler will perform type checking and then generate LLVM code.
+This command will create `<file.ll>` and `<file.bc>` files. The generated LLVM
+code is stored in `<file.ll>`, and `<file.bc>` can be executed with:
+```bash
+lli <file.bc>
+```
 
-You can also use the test.sh script as follows:
+You can also use the `test.sh` script as follows:
 ```bash
 ./test.sh <folder>
 ```

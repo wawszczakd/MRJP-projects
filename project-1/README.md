@@ -4,9 +4,8 @@ This project is an implementation of the Instant compiler in Haskell.
 
 ## Overview
 
-Instant is a simple programming language created for the MRJP (Methods of
-Programming Languages Realization) course.
-It consists of only two types of instructions:
+Instant is a simple programming language that consists of only two types of
+instructions:
  * **Expressions** — print their evaluated value,
  * **Assignments** — set a variable’s value with `variable = expression`.
 
